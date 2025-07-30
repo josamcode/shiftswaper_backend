@@ -1,35 +1,71 @@
-// models/company.model.js
+// models/employee-request.model.js
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-const CompanySchema = new mongoose.Schema(
+const EmployeeRequestSchema = new mongoose.Schema(
   {
-    name: {
+    fullName: {
       type: String,
       required: true,
-      unique: true,
-      trim: true,
     },
-    description: {
+    accountName: {
       type: String,
       required: true,
-      trim: true,
     },
     email: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
       lowercase: true,
+      validate: {
+        validator: function (v) {
+          return /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/.test(v);
+        },
+        message: props => `${props.value} is not a valid email address!`
+      }
+    },
+    position: {
+      type: String,
+      required: true,
+      enum: ["expert", "supervisor", "sme"]
     },
     password: {
       type: String,
       required: true,
       minlength: 6,
     },
-    isVerified: {
-      type: Boolean,
-      default: false,
+    companyId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Company',
+      required: true,
+    },
+    supervisorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Employee',
+      required: false,
+    },
+    status: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'pending',
+    },
+    rejectionReason: {
+      type: String,
+      trim: true,
+    },
+    approvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Employee',
+    },
+    approvedAt: {
+      type: Date,
+    },
+    rejectedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Employee',
+    },
+    rejectedAt: {
+      type: Date,
     },
     otp: {
       type: String,
@@ -54,7 +90,7 @@ const CompanySchema = new mongoose.Schema(
 );
 
 // Hash password before saving
-CompanySchema.pre('save', async function (next) {
+EmployeeRequestSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
 
   try {
@@ -66,13 +102,8 @@ CompanySchema.pre('save', async function (next) {
   }
 });
 
-// Compare input password with hashed password
-CompanySchema.methods.comparePassword = async function (candidatePassword) {
-  return await bcrypt.compare(candidatePassword, this.password);
-};
-
 // Generate OTP with rate limiting
-CompanySchema.methods.generateOTP = function () {
+EmployeeRequestSchema.methods.generateOTP = function () {
   const now = new Date();
 
   // Check if account is locked
@@ -105,7 +136,7 @@ CompanySchema.methods.generateOTP = function () {
 };
 
 // Verify OTP with attempt tracking
-CompanySchema.methods.verifyOTP = function (otp) {
+EmployeeRequestSchema.methods.verifyOTP = function (otp) {
   const now = new Date();
 
   // Check if account is locked
@@ -126,7 +157,6 @@ CompanySchema.methods.verifyOTP = function (otp) {
     this.lastOTPSentAt = undefined;
     this.otpAttempts = 0;
     this.lockedUntil = undefined;
-    this.isVerified = true;
     return true;
   } else {
     // Failed attempt - increment counter
@@ -142,4 +172,4 @@ CompanySchema.methods.verifyOTP = function (otp) {
   }
 };
 
-module.exports = mongoose.model('Company', CompanySchema);
+module.exports = mongoose.model('EmployeeRequest', EmployeeRequestSchema);

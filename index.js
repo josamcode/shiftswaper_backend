@@ -4,7 +4,9 @@ const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const authRoutes = require('./routes/auth.routes');
-const employeeAuthRoutes = require('./routes/employee-auth.routes');
+const employeeRequestRoutes = require('./routes/employee-request.routes');
+const shiftSwapRequestRoutes = require('./routes/shift-swap-request.routes');
+const dayOffSwapRequestRoutes = require('./routes/day-off-swap-request.routes');
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI);
@@ -22,7 +24,9 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api/company-auth', authRoutes);
-app.use('/api/employee-auth', employeeAuthRoutes);
+app.use('/api/employee-requests', employeeRequestRoutes);
+app.use('/api/shift-swap-requests', shiftSwapRequestRoutes);
+app.use('/api/day-off-swap-requests', dayOffSwapRequestRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

@@ -173,10 +173,10 @@ const verifyEmployeeOTP = async (req, res) => {
 // Login employee with password
 const loginEmployee = async (req, res) => {
   try {
-    const { phone, password } = req.body;
+    const { email, password } = req.body;
 
     // Find employee by phone
-    const employee = await Employee.findOne({ phone });
+    const employee = await Employee.findOne({ email: email.toLowerCase() });
 
     if (!employee) {
       return res.status(404).json({

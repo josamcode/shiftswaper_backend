@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 
 const DayOffSwapRequestSchema = new mongoose.Schema(
   {
+    // Requester's details
     originalDayOff: {
       type: Date,
       required: true,
@@ -11,13 +12,30 @@ const DayOffSwapRequestSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
+    // Optional shift details for the requested day
+    shiftStartDate: {
+      type: Date,
+      required: false,
+    },
+    shiftEndDate: {
+      type: Date,
+      required: false,
+    },
+    overtimeStart: {
+      type: Date,
+      required: false,
+    },
+    overtimeEnd: {
+      type: Date,
+      required: false,
+    },
     reason: {
       type: String,
       required: true,
     },
     status: {
       type: String,
-      enum: ['pending', 'approved', 'rejected'],
+      enum: ['pending', 'matched', 'approved', 'rejected'],
       default: 'pending',
     },
     requesterUserId: {
@@ -25,9 +43,31 @@ const DayOffSwapRequestSchema = new mongoose.Schema(
       ref: 'Employee',
       required: true,
     },
-    swapWithId: {
+    // Receiver details (filled when matched)
+    receiverUserId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Employee',
+      required: false,
+    },
+    receiverOriginalDayOff: {
+      type: Date,
+      required: false,
+    },
+    // Optional shift details for the receiver's original day
+    receiverShiftStartDate: {
+      type: Date,
+      required: false,
+    },
+    receiverShiftEndDate: {
+      type: Date,
+      required: false,
+    },
+    receiverOvertimeStart: {
+      type: Date,
+      required: false,
+    },
+    receiverOvertimeEnd: {
+      type: Date,
       required: false,
     },
     firstSupervisorId: {
@@ -40,19 +80,38 @@ const DayOffSwapRequestSchema = new mongoose.Schema(
       ref: 'Employee',
       required: false,
     },
+    statusEditedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Employee',
+      default: null,
+    },
     companyId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Company',
       required: true,
     },
-    createdAt: {
-      type: Date,
-      default: Date.now,
-    },
-    updatedAt: {
-      type: Date,
-      default: Date.now,
-    },
+    // Matching history
+    matches: [{
+      matchedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Employee',
+        required: true,
+      },
+      originalDayOff: Date, // Their original day off
+      shiftStartDate: Date,
+      shiftEndDate: Date,
+      overtimeStart: Date,
+      overtimeEnd: Date,
+      matchedAt: {
+        type: Date,
+        default: Date.now,
+      },
+      status: {
+        type: String,
+        enum: ['proposed', 'accepted', 'rejected'],
+        default: 'proposed'
+      }
+    }]
   },
   { timestamps: true }
 );

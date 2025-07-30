@@ -1,5 +1,7 @@
-// routes/auth.routes.js
 const express = require('express');
+const router = express.Router();
+
+// routes/auth.routes.js
 const {
   registerCompany,
   verifyOTP,
@@ -12,8 +14,6 @@ const {
   validateVerifyOTP
 } = require('../validators/auth.validator');
 const { handleValidationErrors } = require('../validators/validationResult');
-
-const router = express.Router();
 
 // Register company (step 1)
 router.post('/register',

@@ -177,24 +177,18 @@ const loginCompany = async (req, res) => {
     }
 
     // Generate JWT token
-    const token = JWTService.generateToken({
-      companyId: company._id,
-      email: company.email,
-      name: company.name
-    });
+    const token = JWTService.generateCompanyToken(company);
 
     res.json({
       success: true,
       message: 'Login successful',
-      data: {
-        company: {
-          id: company._id,
-          name: company.name,
-          email: company.email,
-          isVerified: company.isVerified
-        },
-        token
-      }
+      company: {
+        id: company._id,
+        name: company.name,
+        email: company.email,
+        isVerified: company.isVerified
+      },
+      token
     });
 
   } catch (error) {

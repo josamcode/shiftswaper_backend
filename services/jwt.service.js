@@ -15,6 +15,28 @@ class JWTService {
       return null;
     }
   }
+
+  // Generate company token
+  generateCompanyToken(company) {
+    const payload = {
+      companyId: company._id,
+      email: company.email,
+      name: company.name
+    };
+    return this.generateToken(payload);
+  }
+
+  // Generate employee token
+  generateEmployeeToken(employee) {
+    const payload = {
+      employeeId: employee._id,
+      email: employee.email,
+      fullName: employee.fullName,
+      companyId: employee.companyId,
+      position: employee.position
+    };
+    return this.generateToken(payload);
+  }
 }
 
 module.exports = new JWTService();
