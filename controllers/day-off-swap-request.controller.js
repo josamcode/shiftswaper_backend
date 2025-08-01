@@ -102,7 +102,7 @@ const createDayOffSwapRequest = async (req, res) => {
 };
 
 // Get day off swap requests (with filtering)
-const getDayOffSwapRequests = async (req, res) => {
+const getMyDayOffSwapRequests = async (req, res) => {
   try {
     const { status, requesterId, receiverId } = req.query;
     const employeeId = req.employeeId;
@@ -135,6 +135,56 @@ const getDayOffSwapRequests = async (req, res) => {
       ];
     }
 
+    const requests = await DayOffSwapRequest.find(filter)
+      .populate([
+        { path: 'requesterUserId', select: 'fullName accountName email position' },
+        { path: 'receiverUserId', select: 'fullName accountName email position' },
+        { path: 'firstSupervisorId', select: 'fullName accountName email position' },
+        { path: 'secondSupervisorId', select: 'fullName accountName email position' },
+        { path: 'statusEditedBy', select: 'fullName accountName email position' },
+        { path: 'companyId', select: 'name' },
+        { path: 'matches.matchedBy', select: 'fullName accountName email position' }
+      ])
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      data: {
+        requests
+      }
+    });
+
+  } catch (error) {
+    console.error('Get day off swap requests error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+};
+
+// Get all d.. requests
+const getDayOffSwapRequests = async (req, res) => {
+  try {
+    const { status, requesterId, receiverId } = req.query;
+    const companyId = req.employee.companyId;
+
+    let filter = { companyId };
+
+    // Apply filters
+    if (status) {
+      filter.status = status;
+    }
+
+    if (requesterId) {
+      filter.requesterUserId = requesterId;
+    }
+
+    if (receiverId) {
+      filter.receiverUserId = receiverId;
+    }
+
+    // Get all requests made by employees in the same company
     const requests = await DayOffSwapRequest.find(filter)
       .populate([
         { path: 'requesterUserId', select: 'fullName accountName email position' },
@@ -236,6 +286,7 @@ const matchDayOffSwapRequest = async (req, res) => {
     const matchedBy = req.employeeId;
     const companyId = req.employee.companyId;
 
+    // Find the day-off swap request
     const request = await DayOffSwapRequest.findById(requestId);
 
     if (!request) {
@@ -245,6 +296,7 @@ const matchDayOffSwapRequest = async (req, res) => {
       });
     }
 
+    // Check company ownership
     if (request.companyId.toString() !== companyId.toString()) {
       return res.status(403).json({
         success: false,
@@ -252,6 +304,7 @@ const matchDayOffSwapRequest = async (req, res) => {
       });
     }
 
+    // Prevent self-matching
     if (request.requesterUserId.toString() === matchedBy.toString()) {
       return res.status(400).json({
         success: false,
@@ -259,14 +312,27 @@ const matchDayOffSwapRequest = async (req, res) => {
       });
     }
 
-    if (request.status !== 'pending') {
+    // Allow matching only if status is 'pending' or 'matched'
+    if (request.status !== 'pending' && request.status !== 'matched') {
       return res.status(400).json({
         success: false,
-        message: `Request is already ${request.status}. No new matches can be made.`
+        message: `Request is ${request.status}. No new matches can be made.`
       });
     }
 
-    // Check if the requester's requested day off matches the matcher's original day off
+    // Prevent duplicate match from the same employee
+    const alreadyMatched = request.matches.some(
+      match => match.matchedBy.toString() === matchedBy.toString()
+    );
+
+    if (alreadyMatched) {
+      return res.status(400).json({
+        success: false,
+        message: 'You have already proposed a match for this request. Duplicate proposals are not allowed.'
+      });
+    }
+
+    // Check if the matcher's original day off matches the requester's requested day off
     const requesterRequestedDay = new Date(request.requestedDayOff);
     const matcherOriginalDay = new Date(originalDayOff);
 
@@ -277,6 +343,7 @@ const matchDayOffSwapRequest = async (req, res) => {
       });
     }
 
+    // Add the new match proposal
     request.matches.push({
       matchedBy,
       originalDayOff,
@@ -287,12 +354,15 @@ const matchDayOffSwapRequest = async (req, res) => {
       status: 'proposed'
     });
 
+    // Only update status to 'matched' if it was still 'pending'
     if (request.status === 'pending') {
       request.status = 'matched';
     }
 
+    // Save the updated request
     await request.save();
 
+    // Notify the requester via email (best effort)
     try {
       await request.populate([
         { path: 'requesterUserId', select: 'fullName email' },
@@ -311,12 +381,14 @@ const matchDayOffSwapRequest = async (req, res) => {
       console.error('Error preparing or sending new match email:', emailError);
     }
 
+    // Populate full data for response
     await request.populate([
       { path: 'requesterUserId', select: 'fullName accountName email' },
       { path: 'companyId', select: 'name' },
       { path: 'matches.matchedBy', select: 'fullName accountName email' }
     ]);
 
+    // Success response
     res.json({
       success: true,
       message: 'Match proposal submitted successfully',
@@ -665,6 +737,7 @@ const deleteDayOffSwapRequest = async (req, res) => {
 
 module.exports = {
   createDayOffSwapRequest,
+  getMyDayOffSwapRequests,
   getDayOffSwapRequests,
   getDayOffSwapRequestById,
   matchDayOffSwapRequest,

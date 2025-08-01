@@ -10,7 +10,8 @@ const {
   counterOffer,
   acceptCounterOffer,
   updateRequestStatus,
-  acceptSpecificOffer
+  acceptSpecificOffer,
+  getMyShiftSwapRequests
 } = require('../controllers/shift-swap-request.controller');
 const {
   validateCreateShiftSwapRequest,
@@ -38,6 +39,11 @@ router.post('/',
 // Get shift swap requests (with filtering)
 router.get('/',
   getShiftSwapRequests
+);
+
+// Get shift swap requests by me
+router.get('/my',
+  getMyShiftSwapRequests
 );
 
 // Get shift swap request by ID

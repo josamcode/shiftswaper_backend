@@ -102,6 +102,56 @@ const createShiftSwapRequest = async (req, res) => {
 const getShiftSwapRequests = async (req, res) => {
   try {
     const { status, requesterId, receiverId } = req.query;
+    const companyId = req.employee.companyId;
+
+    let filter = { companyId };
+
+    // Apply filters
+    if (status) {
+      filter.status = status;
+    }
+
+    if (requesterId) {
+      filter.requesterUserId = requesterId;
+    }
+
+    if (receiverId) {
+      filter.receiverUserId = receiverId;
+    }
+
+    // Get all requests made by any employee in the same company
+    const requests = await ShiftSwapRequest.find(filter)
+      .populate([
+        { path: 'requesterUserId', select: 'fullName accountName email position' },
+        { path: 'receiverUserId', select: 'fullName accountName email position' },
+        { path: 'firstSupervisorId', select: 'fullName accountName email position' },
+        { path: 'secondSupervisorId', select: 'fullName accountName email position' },
+        { path: 'statusEditedBy', select: 'fullName accountName email position' },
+        { path: 'companyId', select: 'name' },
+        { path: 'negotiationHistory.offeredBy', select: 'fullName accountName email position' }
+      ])
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      data: {
+        requests
+      }
+    });
+
+  } catch (error) {
+    console.error('Get shift swap requests error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+};
+
+// Get My requests
+const getMyShiftSwapRequests = async (req, res) => {
+  try {
+    const { status, requesterId, receiverId } = req.query;
     const employeeId = req.employeeId;
     const companyId = req.employee.companyId;
 
@@ -577,16 +627,15 @@ const counterOffer = async (req, res) => {
       }
     }
 
-    const isExactTimeMatch =
-      offeredShiftStart.getTime() === originalShiftStart.getTime() &&
-      offeredShiftEnd.getTime() === originalShiftEnd.getTime() &&
-      (offeredOvertimeStart?.getTime() === request.overtimeStart?.getTime() || (!offeredOvertimeStart && !request.overtimeStart)) &&
-      (offeredOvertimeEnd?.getTime() === request.overtimeEnd?.getTime() || (!offeredOvertimeEnd && !request.overtimeEnd));
+    const isShiftStartIdentical = offeredShiftStart.getTime() === originalShiftStart.getTime();
+    const isShiftEndIdentical = offeredShiftEnd.getTime() === originalShiftEnd.getTime();
 
-    if (isExactTimeMatch) {
+    if (isShiftStartIdentical && isShiftEndIdentical) {
       return res.status(400).json({
         success: false,
-        message: 'Offered shift times must be different from the original requester\'s shift times.'
+        message:
+          'You cannot offer a shift with the same start and end time as the original. ' +
+          'Please propose a different shift time to make a valid offer.'
       });
     }
 
@@ -686,20 +735,28 @@ const counterOffer = async (req, res) => {
 // Accept a specific counter offer (requester chooses one from the list)
 const acceptSpecificOffer = async (req, res) => {
   try {
-    const { requestId, offerId } = req.body; // Accept Offer ID now
-    const employeeId = req.employeeId;       // Employee A (Requester)
+    const { requestId, offerId } = req.body;
+    const employeeId = req.employeeId;       // Requester (Employee A)
     const companyId = req.employee.companyId;
 
-    const request = await ShiftSwapRequest.findById(requestId);
-
-    if (!request) {
-      return res.status(404).json({
+    // Validate required fields
+    if (!requestId || !offerId) {
+      return res.status(400).json({
         success: false,
-        message: 'Shift swap request not found'
+        message: 'Request ID and Offer ID are required.'
       });
     }
 
-    // Check if request belongs to same company
+    // Fetch the shift swap request
+    const request = await ShiftSwapRequest.findById(requestId);
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: 'Shift swap request not found.'
+      });
+    }
+
+    // Check company access
     if (request.companyId.toString() !== companyId.toString()) {
       return res.status(403).json({
         success: false,
@@ -707,7 +764,7 @@ const acceptSpecificOffer = async (req, res) => {
       });
     }
 
-    // Check if requester is accepting their own request
+    // Ensure only the requester can accept offers
     if (request.requesterUserId.toString() !== employeeId.toString()) {
       return res.status(403).json({
         success: false,
@@ -715,62 +772,64 @@ const acceptSpecificOffer = async (req, res) => {
       });
     }
 
-    // Check if request is in a state to accept offers
-    if (request.status !== 'offers_received' && request.status !== 'pending') { // Allow accepting if there was somehow an offer already
+    // Prevent re-acceptance (idempotency)
+    if (request.status === 'approved' || request.status === 'rejected') {
       return res.status(400).json({
         success: false,
-        message: `Request is in ${request.status} state. Cannot accept offers now.`
+        message: `Request has already been ${request.status}. Cannot accept offers now.`
       });
     }
 
-    // Find the specific offer in negotiationHistory by offerId
-    const offerIndex = request.negotiationHistory.findIndex(offer => offer._id.toString() === offerId && offer.status === 'offered');
+    // Find the specific offer by offerId and status
+    const offerIndex = request.negotiationHistory.findIndex(
+      offer => offer._id.toString() === offerId && offer.status === 'offered'
+    );
+
     if (offerIndex === -1) {
       return res.status(404).json({
         success: false,
-        message: 'Offer not found or not available for acceptance.'
+        message: 'Offer not found or already processed (accepted/rejected).'
       });
     }
+
     const selectedOffer = request.negotiationHistory[offerIndex];
 
-    // Mark the selected offer as accepted
+    // Mark selected offer as accepted
     request.negotiationHistory[offerIndex].status = 'accepted';
 
-    // Mark all other 'offered' offers as 'rejected' (optional, but good practice)
-    request.negotiationHistory.forEach((offer, index) => {
-      if (index !== offerIndex && offer.status === 'offered') {
-        request.negotiationHistory[index].status = 'rejected';
+    // Reject all other 'offered' offers
+    for (let i = 0; i < request.negotiationHistory.length; i++) {
+      if (i !== offerIndex && request.negotiationHistory[i].status === 'offered') {
+        request.negotiationHistory[i].status = 'rejected';
       }
-    });
+    }
 
-    // Update the main request details with the accepted offer's details
+    // Update main request with accepted offer details
     request.shiftStartDate = selectedOffer.shiftStartDate;
     request.shiftEndDate = selectedOffer.shiftEndDate;
     request.overtimeStart = selectedOffer.overtimeStart;
     request.overtimeEnd = selectedOffer.overtimeEnd;
+    request.receiverUserId = selectedOffer.offeredBy; // Employee B (offer maker)
 
-    // Set receiver and second supervisor based on the accepted offer
-    request.receiverUserId = selectedOffer.offeredBy; // Employee B who made the accepted offer
-
-    // Need to get the supervisor of the Employee B (selectedOffer.offeredBy)
+    // Set second supervisor from the accepted offer's employee
     const acceptedOfferEmployee = await Employee.findById(selectedOffer.offeredBy).select('supervisorId');
     if (acceptedOfferEmployee && acceptedOfferEmployee.supervisorId) {
       request.secondSupervisorId = acceptedOfferEmployee.supervisorId;
     } else {
-      // Handle case where Employee B has no supervisor? Maybe log a warning?
-      console.warn(`Accepted offer employee ${selectedOffer.offeredBy} has no supervisor.`);
+      console.warn(`Accepted offer employee ${selectedOffer.offeredBy} has no supervisor assigned.`);
     }
 
-    // Update main request status to pending for supervisor approval
+    // Update status to 'pending' for supervisor approval
     request.status = 'pending';
 
+    // Save the updated request
     await request.save();
 
+    // === EMAIL NOTIFICATIONS ===
     try {
+      // 1. Send "offer accepted" email ONLY to the accepted offer maker
       const offerMaker = await Employee.findById(selectedOffer.offeredBy).select('fullName email');
-
       if (offerMaker) {
-        // Add offerMaker to request object for email template
         const emailRequestData = request.toObject();
         emailRequestData.offerMaker = offerMaker;
 
@@ -781,16 +840,43 @@ const acceptSpecificOffer = async (req, res) => {
         );
 
         if (!emailResult.success) {
-          console.error('Failed to send offer accepted email:', emailResult.error);
+          console.error('Failed to send "offer accepted" email:', emailResult.error);
+        } else {
+          console.log(`Sent "offer accepted" email to: ${offerMaker.email}`);
         }
       } else {
-        console.warn(`Offer maker with ID ${selectedOffer.offeredBy} not found for email notification`);
+        console.warn(`Offer maker with ID ${selectedOffer.offeredBy} not found for email notification.`);
       }
+
+      // 2. (Optional) Notify other employees that their offer was rejected
+      for (const offer of request.negotiationHistory) {
+        if (offer.status === 'rejected') {
+          const rejectedEmployee = await Employee.findById(offer.offeredBy).select('fullName email');
+          if (rejectedEmployee) {
+            const emailData = request.toObject();
+            emailData.offerMaker = rejectedEmployee; // Personalize template
+
+            const rejectionEmailResult = await EmailService.sendShiftSwapNotification(
+              'offer_rejected', // You may need to add this type in EmailService
+              rejectedEmployee,
+              emailData
+            );
+
+            if (!rejectionEmailResult.success) {
+              console.error(`Failed to send rejection email to ${rejectedEmployee.email}:`, rejectionEmailResult.error);
+            } else {
+              console.log(`Sent "offer rejected" email to: ${rejectedEmployee.email}`);
+            }
+          }
+        }
+      }
+
     } catch (emailError) {
-      console.error('Error preparing or sending offer accepted email:', emailError);
+      console.error('Error during email notification:', emailError);
+      // Don't fail the whole request — just log email issues
     }
 
-    // Populate references for response (as before)
+    // Populate for response
     await request.populate([
       { path: 'requesterUserId', select: 'fullName accountName email' },
       { path: 'receiverUserId', select: 'fullName accountName email' },
@@ -800,6 +886,7 @@ const acceptSpecificOffer = async (req, res) => {
       { path: 'negotiationHistory.offeredBy', select: 'fullName accountName email position' }
     ]);
 
+    // Success response
     res.json({
       success: true,
       message: 'Offer accepted successfully. Request is now pending supervisor approval.',
@@ -808,12 +895,11 @@ const acceptSpecificOffer = async (req, res) => {
       }
     });
 
-
   } catch (error) {
     console.error('Accept specific offer error:', error);
     res.status(500).json({
       success: false,
-      message: 'Internal server error'
+      message: 'Internal server error while accepting offer.'
     });
   }
 };
@@ -958,6 +1044,7 @@ const updateRequestStatus = async (req, res) => {
 module.exports = {
   createShiftSwapRequest,
   getShiftSwapRequests,
+  getMyShiftSwapRequests,
   getShiftSwapRequestById,
   updateShiftSwapRequest,
   deleteShiftSwapRequest,

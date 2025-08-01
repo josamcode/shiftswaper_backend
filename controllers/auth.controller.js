@@ -258,9 +258,28 @@ const resendOTP = async (req, res) => {
   }
 };
 
+// Get all companies (name and ID only)
+const getAllCompanies = async (req, res) => {
+  try {
+    const companies = await Company.find({}, '_id name'); // Only fetch _id and name
+
+    res.status(200).json({
+      success: true,
+      data: companies
+    });
+  } catch (error) {
+    console.error('Error fetching companies:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+};
+
 module.exports = {
   registerCompany,
   verifyOTP,
   loginCompany,
-  resendOTP
+  resendOTP,
+  getAllCompanies
 };

@@ -6,7 +6,8 @@ const {
   registerCompany,
   verifyOTP,
   loginCompany,
-  resendOTP
+  resendOTP,
+  getAllCompanies
 } = require('../controllers/auth.controller');
 const {
   validateRegister,
@@ -42,5 +43,8 @@ router.post('/resend-otp',
   handleValidationErrors,
   resendOTP
 );
+
+// Get all companies (public route)
+router.get('/companies', getAllCompanies);
 
 module.exports = router;

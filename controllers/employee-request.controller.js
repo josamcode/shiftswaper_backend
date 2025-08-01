@@ -4,6 +4,7 @@ const Employee = require('../models/employee.model');
 const Company = require('../models/company.model');
 const EmailService = require('../services/email.service');
 const JWTService = require('../services/jwt.service');
+const emailService = require('../services/email.service');
 
 // Submit employee request to company
 const submitEmployeeRequest = async (req, res) => {
@@ -351,7 +352,7 @@ const loginEmployee = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Find employee by EMAIL (not phone)
+    // Find employee by email
     const employee = await Employee.findOne({ email });
 
     if (!employee) {
@@ -393,14 +394,20 @@ const loginEmployee = async (req, res) => {
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'  // Fixed: was "phone or password"
+        message: 'Invalid email or password'
       });
+    }
+
+    // Fetch company data to get the company name
+    let company = null;
+    if (employee.companyId) {
+      company = await Company.findById(employee.companyId).select('name'); // Only get the name field
     }
 
     // Generate JWT token
     const token = JWTService.generateToken({
       employeeId: employee._id,
-      email: employee.email,  // Fixed: was phone
+      email: employee.email,
       fullName: employee.fullName,
       companyId: employee.companyId,
       position: employee.position
@@ -414,9 +421,10 @@ const loginEmployee = async (req, res) => {
           id: employee._id,
           fullName: employee.fullName,
           accountName: employee.accountName,
-          email: employee.email,  // Fixed: was phone
+          email: employee.email,
           position: employee.position,
-          isVerified: employee.isVerified
+          isVerified: employee.isVerified,
+          companyName: company ? company.name : null
         },
         token
       }
@@ -462,7 +470,7 @@ const resendRequestOTP = async (req, res) => {
     await employeeRequest.save();
 
     // Send OTP via Email
-    const emailResult = await EmailService.sendOTP(employeeRequest.email, otp, 'verification');
+    const emailResult = await emailService.sendOTP(employeeRequest.email, otp, 'verification');
 
     if (!emailResult.success) {
       return res.status(500).json({

@@ -3,10 +3,12 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
+const cors = require('cors');
 const authRoutes = require('./routes/auth.routes');
 const employeeRequestRoutes = require('./routes/employee-request.routes');
 const shiftSwapRequestRoutes = require('./routes/shift-swap-request.routes');
 const dayOffSwapRequestRoutes = require('./routes/day-off-swap-request.routes');
+const employeeRoutes = require('./routes/employee.routes');
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI);
@@ -22,11 +24,17 @@ const app = express();
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+app.use(cors({
+  origin: 'http://localhost:3000',
+  credentials: true
+}));
+
 // Routes
 app.use('/api/company-auth', authRoutes);
 app.use('/api/employee-requests', employeeRequestRoutes);
 app.use('/api/shift-swap-requests', shiftSwapRequestRoutes);
 app.use('/api/day-off-swap-requests', dayOffSwapRequestRoutes);
+app.use('/api/employees', employeeRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

@@ -66,7 +66,12 @@ const EmployeeSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Compare input password with hashed password
+EmployeeSchema.methods.toJSON = function () {
+  const employee = this.toObject();
+  delete employee.password;
+  return employee;
+};
+
 EmployeeSchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };

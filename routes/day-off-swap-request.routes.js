@@ -3,11 +3,12 @@ const express = require('express');
 const {
   createDayOffSwapRequest,
   getDayOffSwapRequests,
+  getMyDayOffSwapRequests,
   getDayOffSwapRequestById,
   matchDayOffSwapRequest,
   acceptMatch,
   updateRequestStatus,
-  deleteDayOffSwapRequest
+  deleteDayOffSwapRequest,
 } = require('../controllers/day-off-swap-request.controller');
 const {
   validateCreateDayOffSwapRequest,
@@ -29,6 +30,11 @@ router.post('/',
   validateCreateDayOffSwapRequest,
   handleValidationErrors,
   createDayOffSwapRequest
+);
+
+// Get day off swap requests by me (with filtering)
+router.get('/my',
+  getMyDayOffSwapRequests
 );
 
 // Get day off swap requests (with filtering)
