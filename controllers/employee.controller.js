@@ -6,7 +6,7 @@ const getCompanySupervisors = async (req, res) => {
   try {
     const supervisors = await Employee.find({
       companyId: req.companyId,
-      position: 'supervisor',
+      position: { $in: ['supervisor', 'moderator'] },
       isVerified: true
     }).select('_id fullName accountName email position');
 

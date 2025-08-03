@@ -5,95 +5,114 @@ const Company = require('../models/company.model');
 const EmailService = require('../services/email.service');
 const JWTService = require('../services/jwt.service');
 const emailService = require('../services/email.service');
+const employeesIDsModel = require('../models/employeesIDs.model');
 
 // Submit employee request to company
 const submitEmployeeRequest = async (req, res) => {
   try {
-    const { fullName, accountName, email, position, password, companyId } = req.body;
+    const { fullName, accountName, email, phoneNumber, position, password, companyId, employeeId } = req.body;
 
-    // Check if company exists
+    // 1. Validate required fields
+    if (!fullName || !accountName || !email || !phoneNumber || !position || !password || !companyId || !employeeId) {
+      return res.status(400).json({
+        success: false,
+        message: 'All fields (fullName, accountName, email, phoneNumber, position, password, companyId, employeeId) are required.',
+      });
+    }
+
+    // 2. Check if company exists
     const company = await Company.findById(companyId);
     if (!company) {
       return res.status(404).json({
         success: false,
-        message: 'Company not found'
+        message: 'Company not found',
       });
     }
 
-    // Check if employee request already exists
-    const existingRequest = await EmployeeRequest.findOne({ email });
+    // 3. Validate employeeId exists and belongs to this company
+    const validEmployeeId = await employeesIDsModel.findOne({
+      employeeId: employeeId.trim().toUpperCase(),
+      companyId: companyId,
+    });
 
+    if (!validEmployeeId) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid or unauthorized employee ID. The ID "${employeeId}" does not exist or does not belong to this company.`,
+      });
+    }
+
+    // 4. Prevent duplicate email (request or approved)
+    const existingRequest = await EmployeeRequest.findOne({ email });
     if (existingRequest) {
       if (existingRequest.status === 'pending') {
         return res.status(400).json({
           success: false,
-          message: 'A request with this email is already pending approval'
+          message: 'A request with this email is already pending approval.',
         });
       } else if (existingRequest.status === 'approved') {
         return res.status(400).json({
           success: false,
-          message: 'An employee with this email is already registered'
+          message: 'An employee with this email is already registered.',
         });
       }
     }
 
-    // Check if employee already exists
     const existingEmployee = await Employee.findOne({ email });
     if (existingEmployee) {
       return res.status(400).json({
         success: false,
-        message: 'An employee with this email is already registered'
+        message: 'An employee with this email is already registered.',
       });
     }
 
-    // Create employee request
+    // 5. Create request
     const employeeRequest = new EmployeeRequest({
-      fullName,
-      accountName,
-      email,
-      position,
+      fullName: fullName.trim(),
+      accountName: accountName.trim(),
+      email: email.trim().toLowerCase(),
+      phoneNumber: phoneNumber.trim(), // Will be validated by Mongoose
+      position: position.toLowerCase(),
       password,
-      companyId
+      employeeId: validEmployeeId.employeeId,
+      companyId,
     });
 
-    // Generate and save OTP
+    // 6. Generate OTP
     let otp;
     try {
       otp = employeeRequest.generateOTP();
     } catch (rateLimitError) {
       return res.status(429).json({
         success: false,
-        message: rateLimitError.message
+        message: rateLimitError.message,
       });
     }
 
     await employeeRequest.save();
 
-    // Send OTP via Email for verification
+    // 7. Send OTP
     const emailResult = await EmailService.sendOTP(email, otp, 'verification');
-
     if (!emailResult.success) {
-      // Rollback request creation if email fails
       await EmployeeRequest.findByIdAndDelete(employeeRequest._id);
       return res.status(500).json({
         success: false,
-        message: 'Failed to send verification OTP via email. Please try again.'
+        message: 'Failed to send verification OTP. Please try again.',
       });
     }
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
-      message: 'Employee request submitted successfully. Please check your email for verification OTP.',
+      message: 'Employee request submitted successfully. Please verify your email using the OTP.',
       requestId: employeeRequest._id,
       status: employeeRequest.status,
-      createdAt: employeeRequest.createdAt
+      createdAt: employeeRequest.createdAt,
     });
-
   } catch (error) {
     console.error('Employee request submission error:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message: 'Internal server error'
+      message: 'Internal server error. Please try again later.',
     });
   }
 };
@@ -241,11 +260,11 @@ const processEmployeeRequest = async (req, res) => {
       let finalSupervisorId = null; // Default to null
 
       // If the position is 'supervisor', they should not have a supervisor
-      if (employeeRequest.position === 'supervisor') {
+      if (employeeRequest.position === 'moderator') {
         if (supervisorId !== undefined && supervisorId !== null) {
           return res.status(400).json({
             success: false,
-            message: 'Supervisors cannot be assigned a supervisor. Please leave supervisorId empty or null.'
+            message: 'Moderators cannot be assigned a moderator. Please leave supervisorId empty or null.'
           });
         }
         // If position is supervisor, finalSupervisorId remains null
@@ -294,6 +313,7 @@ const processEmployeeRequest = async (req, res) => {
         position: employeeRequest.position,
         password: employeeRequest.password, // Already hashed
         companyId: employeeRequest.companyId,
+        employeeId: employeeRequest.employeeId,
         supervisorId: employeeRequest.supervisorId,
         employeeRequestId: employeeRequest._id,
         isVerified: true
@@ -350,58 +370,83 @@ const processEmployeeRequest = async (req, res) => {
 // Employee login
 const loginEmployee = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, employeeId: inputEmployeeId, password } = req.body;
 
-    // Find employee by email
-    const employee = await Employee.findOne({ email });
-
-    if (!employee) {
-      // Check if there's a pending request for this email
-      const pendingRequest = await EmployeeRequest.findOne({
-        email,
-        status: 'pending'
+    // Ensure at least one identifier is provided
+    if (!email && !inputEmployeeId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide either email or employee ID',
       });
+    }
 
-      if (pendingRequest) {
-        return res.status(400).json({
-          success: false,
-          message: 'Your registration request is still pending approval from the company'
-        });
+    let employee;
+    let lookupField;
+
+    // First, try to find by employeeId (if provided)
+    if (inputEmployeeId) {
+      employee = await Employee.findOne({ employeeId: inputEmployeeId.trim().toUpperCase() });
+      if (employee) {
+        lookupField = 'employeeId';
       }
+    }
 
-      // Check if there's a rejected request for this email
-      const rejectedRequest = await EmployeeRequest.findOne({
-        email,
-        status: 'rejected'
-      });
+    // If not found by employeeId, try by email
+    if (!employee && email) {
+      employee = await Employee.findOne({ email: email.toLowerCase().trim() });
+      if (employee) {
+        lookupField = 'email';
+      }
+    }
 
-      if (rejectedRequest) {
-        return res.status(400).json({
-          success: false,
-          message: 'Your registration request was rejected. Reason: ' + rejectedRequest.rejectionReason
+    // If no employee found by either field
+    if (!employee) {
+      // Check for pending request by email (if email was provided)
+      if (email) {
+        const pendingRequest = await EmployeeRequest.findOne({
+          email: email.toLowerCase().trim(),
+          status: 'pending',
         });
+
+        if (pendingRequest) {
+          return res.status(400).json({
+            success: false,
+            message: 'Your registration request is still pending approval from the company',
+          });
+        }
+
+        const rejectedRequest = await EmployeeRequest.findOne({
+          email: email.toLowerCase().trim(),
+          status: 'rejected',
+        });
+
+        if (rejectedRequest) {
+          return res.status(400).json({
+            success: false,
+            message: 'Your registration request was rejected. Reason: ' + rejectedRequest.rejectionReason,
+          });
+        }
       }
 
       return res.status(404).json({
         success: false,
-        message: 'Employee not found'
+        message: 'Employee not found',
       });
     }
 
-    // Compare passwords
+    // Compare password
     const isPasswordValid = await employee.comparePassword(password);
-
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
+        message: 'Invalid email or password',
       });
     }
 
-    // Fetch company data to get the company name
+    // Fetch company name
     let company = null;
     if (employee.companyId) {
-      company = await Company.findById(employee.companyId).select('name'); // Only get the name field
+      company = await Company.findById(employee.companyId).select('name');
     }
 
     // Generate JWT token
@@ -410,10 +455,10 @@ const loginEmployee = async (req, res) => {
       email: employee.email,
       fullName: employee.fullName,
       companyId: employee.companyId,
-      position: employee.position
+      position: employee.position,
     });
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Login successful',
       data: {
@@ -422,19 +467,20 @@ const loginEmployee = async (req, res) => {
           fullName: employee.fullName,
           accountName: employee.accountName,
           email: employee.email,
+          employeeId: employee.employeeId,
           position: employee.position,
           isVerified: employee.isVerified,
-          companyName: company ? company.name : null
+          companyName: company ? company.name : null,
         },
-        token
-      }
+        token,
+      },
     });
-
   } catch (error) {
     console.error('Employee login error:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message: 'Internal server error'
+      message: 'Internal server error. Please try again later.',
+      error: error.message, // Include the error message for debugging purposes
     });
   }
 };

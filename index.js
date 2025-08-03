@@ -1,4 +1,4 @@
-// app.js
+// index.js
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
@@ -9,6 +9,7 @@ const employeeRequestRoutes = require('./routes/employee-request.routes');
 const shiftSwapRequestRoutes = require('./routes/shift-swap-request.routes');
 const dayOffSwapRequestRoutes = require('./routes/day-off-swap-request.routes');
 const employeeRoutes = require('./routes/employee.routes');
+const employeesIDs = require('./routes/employeesIDs.routes')
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI);
@@ -25,7 +26,7 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 app.use(cors({
-  origin: 'https://shiftswaper.vercel.app',
+  origin: ['https://shiftswaper.vercel.app', "http://localhost:3000"],
   credentials: true
 }));
 
@@ -35,6 +36,7 @@ app.use('/api/employee-requests', employeeRequestRoutes);
 app.use('/api/shift-swap-requests', shiftSwapRequestRoutes);
 app.use('/api/day-off-swap-requests', dayOffSwapRequestRoutes);
 app.use('/api/employees', employeeRoutes);
+app.use('/api/employees-ids', employeesIDs);
 
 // Health check
 app.get('/health', (req, res) => {

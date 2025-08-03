@@ -28,7 +28,13 @@ const EmployeeSchema = new mongoose.Schema(
     position: {
       type: String,
       required: true,
-      enum: ["expert", "supervisor", "sme"]
+      enum: ["expert", "supervisor", "sme", "moderator"]
+    },
+    employeeId: {
+      type: String,
+      required: true,
+      trim: true,
+      uppercase: true,
     },
     password: {
       type: String,

@@ -1,5 +1,5 @@
 // validators/employee-request.validator.js
-const { body } = require('express-validator');
+const { body, oneOf } = require('express-validator');
 
 const validateEmployeeRequest = [
   body('fullName')
@@ -24,7 +24,7 @@ const validateEmployeeRequest = [
   body('position')
     .notEmpty()
     .withMessage('Position is required')
-    .isIn(['expert', 'supervisor', 'sme'])
+    .isIn(['expert', 'supervisor', 'sme', "moderator"])
     .withMessage('Position must be expert, supervisor, or sme'),
 
   body('password')
@@ -92,13 +92,6 @@ const validateResendRequestOTP = [
 ];
 
 const validateEmployeeLogin = [
-  body('email')
-    .notEmpty()
-    .withMessage('Email is required')
-    .isEmail()
-    .withMessage('Please provide a valid email address')
-    .normalizeEmail(),
-
   body('password')
     .notEmpty()
     .withMessage('Password is required')

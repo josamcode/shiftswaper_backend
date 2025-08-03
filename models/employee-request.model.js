@@ -1,16 +1,19 @@
 // models/employee-request.model.js
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const validator = require('validator'); // <-- Add this
 
 const EmployeeRequestSchema = new mongoose.Schema(
   {
     fullName: {
       type: String,
       required: true,
+      trim: true,
     },
     accountName: {
       type: String,
       required: true,
+      trim: true,
     },
     email: {
       type: String,
@@ -18,21 +21,37 @@ const EmployeeRequestSchema = new mongoose.Schema(
       trim: true,
       lowercase: true,
       validate: {
-        validator: function (v) {
-          return /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/.test(v);
+        validator: (v) => validator.isEmail(v),
+        message: (props) => `${props.value} is not a valid email address!`,
+      },
+    },
+    phoneNumber: {
+      type: String,
+      required: true,
+      trim: true,
+      validate: {
+        validator: (v) => {
+          // Use validator.js isMobilePhone with multiple locales
+          return validator.isMobilePhone(v, 'any');
         },
-        message: props => `${props.value} is not a valid email address!`
-      }
+        message: (props) => `${props.value} is not a valid international phone number.`,
+      },
     },
     position: {
       type: String,
       required: true,
-      enum: ["expert", "supervisor", "sme"]
+      enum: ['expert', 'supervisor', 'sme', "moderator"],
     },
     password: {
       type: String,
       required: true,
       minlength: 6,
+    },
+    employeeId: {
+      type: String,
+      required: true,
+      trim: true,
+      uppercase: true,
     },
     companyId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -84,7 +103,7 @@ const EmployeeRequestSchema = new mongoose.Schema(
     lockedUntil: {
       type: Date,
       default: null,
-    }
+    },
   },
   { timestamps: true }
 );
@@ -106,52 +125,42 @@ EmployeeRequestSchema.pre('save', async function (next) {
 EmployeeRequestSchema.methods.generateOTP = function () {
   const now = new Date();
 
-  // Check if account is locked
   if (this.lockedUntil && this.lockedUntil > now) {
     const minutesLeft = Math.ceil((this.lockedUntil - now) / (1000 * 60));
     throw new Error(`Account locked. Try again in ${minutesLeft} minutes.`);
   }
 
-  // Check rate limiting (3 minutes between OTPs)
   if (this.lastOTPSentAt) {
     const timeSinceLastOTP = now - this.lastOTPSentAt;
     const minTimeBetweenOTPs = 3 * 60 * 1000; // 3 minutes
-
     if (timeSinceLastOTP < minTimeBetweenOTPs) {
       const minutesLeft = Math.ceil((minTimeBetweenOTPs - timeSinceLastOTP) / (1000 * 60));
       throw new Error(`Please wait ${minutesLeft} minutes before requesting another OTP.`);
     }
   }
 
-  // Generate new OTP
-  const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
   this.otp = otp;
   this.otpExpiresAt = new Date(now.getTime() + 15 * 60 * 1000); // 15 minutes
   this.lastOTPSentAt = now;
-
-  // Reset OTP attempts on new OTP generation
   this.otpAttempts = 0;
 
   return otp;
 };
 
-// Verify OTP with attempt tracking
+// Verify OTP
 EmployeeRequestSchema.methods.verifyOTP = function (otp) {
   const now = new Date();
 
-  // Check if account is locked
   if (this.lockedUntil && this.lockedUntil > now) {
     throw new Error('Account is temporarily locked due to too many failed attempts.');
   }
 
-  // Check if OTP is expired
   if (!this.otpExpiresAt || this.otpExpiresAt <= now) {
     throw new Error('OTP has expired. Please request a new one.');
   }
 
-  // Check OTP
   if (this.otp === otp) {
-    // Success - reset tracking fields
     this.otp = undefined;
     this.otpExpiresAt = undefined;
     this.lastOTPSentAt = undefined;
@@ -159,15 +168,11 @@ EmployeeRequestSchema.methods.verifyOTP = function (otp) {
     this.lockedUntil = undefined;
     return true;
   } else {
-    // Failed attempt - increment counter
     this.otpAttempts += 1;
-
-    // Lock account after 5 failed attempts
     if (this.otpAttempts >= 5) {
-      this.lockedUntil = new Date(now.getTime() + 30 * 60 * 1000); // 30 minutes lock
+      this.lockedUntil = new Date(now.getTime() + 30 * 60 * 1000);
       throw new Error('Too many failed attempts. Account locked for 30 minutes.');
     }
-
     throw new Error(`Invalid OTP. ${5 - this.otpAttempts} attempts remaining.`);
   }
 };
