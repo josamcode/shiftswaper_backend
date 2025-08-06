@@ -66,6 +66,14 @@ const submitEmployeeRequest = async (req, res) => {
       });
     }
 
+    const existingEmployeeById = await Employee.findOne({ employeeId });
+    if (existingEmployeeById) {
+      return res.status(400).json({
+        success: false,
+        message: 'An employee with this ID is already registered.',
+      });
+    }
+
     // 5. Create request
     const employeeRequest = new EmployeeRequest({
       fullName: fullName.trim(),

@@ -15,7 +15,7 @@ class EmailService {
   }
 
   // Professional email template generator
-  generateEmailTemplate(title, content, buttonText = null, buttonUrl = null, type = 'info') {
+  generateEmailTemplate(title, content, buttonText = null, buttonUrl, type = 'info') {
     const colors = {
       info: { primary: '#2563eb', secondary: '#dbeafe' },
       success: { primary: '#059669', secondary: '#d1fae5' },
@@ -53,9 +53,9 @@ class EmailService {
                     <h2 style="margin:0 0 8px;font-size:20px;font-weight:600;color:#111827;">${title}</h2>
                   </div>
                   ${content}
-                  ${buttonText && buttonUrl ? `
+                  ${buttonText ? `
                   <div style="text-align:center;margin:32px 0;">
-                    <a href="${buttonUrl}" style="display:inline-block;padding:12px 24px;background:${color.primary};color:#ffffff;text-decoration:none;border-radius:6px;font-weight:500;font-size:16px;">${buttonText}</a>
+                    <a href="http://shiftswaper.vercel.app/" style="display:inline-block;padding:12px 24px;background:${color.primary};color:#ffffff;text-decoration:none;border-radius:6px;font-weight:500;font-size:16px;">${buttonText}</a>
                   </div>
                   ` : ''}
                 </td>
@@ -79,11 +79,43 @@ class EmailService {
 
   // Shift swap notifications
   async sendShiftSwapNotification(notificationType, recipient, requestData) {
+    console.log(requestData);
+
     const requesterName = requestData.requesterUserId?.fullName || 'Unknown Requester';
+    const receiverName = requestData.receiverUserId?.fullName || 'Unknown Receiver';
+
     const shiftStartDate = requestData.shiftStartDate ? new Date(requestData.shiftStartDate).toLocaleString() : 'Unknown Date';
     const shiftEndDate = requestData.shiftEndDate ? new Date(requestData.shiftEndDate).toLocaleString() : 'Unknown Date';
+    const overtimeStart = requestData.overtimeStart ? new Date(requestData.overtimeStart).toLocaleString() : 'None';
+    const overtimeEnd = requestData.overtimeEnd ? new Date(requestData.overtimeEnd).toLocaleString() : 'None';
+
     const requestReason = requestData.reason || 'No reason provided';
     const requestId = requestData._id || 'Unknown ID';
+    const status = requestData.status || 'Unknown Status';
+    const createdAt = requestData.createdAt ? new Date(requestData.createdAt).toLocaleString() : 'Unknown';
+    const updatedAt = requestData.updatedAt ? new Date(requestData.updatedAt).toLocaleString() : 'Unknown';
+
+    const acceptedOffer = requestData.negotiationHistory?.find(item => item.status === "accepted");
+
+    const newShiftStartDate = acceptedOffer?.shiftStartDate
+      ? new Date(acceptedOffer.shiftStartDate).toLocaleString()
+      : 'Not specified';
+
+    const newShiftEndDate = acceptedOffer?.shiftEndDate
+      ? new Date(acceptedOffer.shiftEndDate).toLocaleString()
+      : 'Not specified';
+
+    const newOvertimeStart = acceptedOffer?.overtimeStart
+      ? new Date(acceptedOffer.overtimeStart).toLocaleString()
+      : 'None';
+
+    const newOvertimeEnd = acceptedOffer?.overtimeEnd
+      ? new Date(acceptedOffer.overtimeEnd).toLocaleString()
+      : 'None';
+
+    const offeredAt = acceptedOffer?.offeredAt
+      ? new Date(acceptedOffer.offeredAt).toLocaleString()
+      : 'Unknown Time';
 
     let subject, content, buttonText, type;
 
@@ -92,38 +124,64 @@ class EmailService {
         subject = 'New Offer for Your Shift Swap Request';
         type = 'info';
         content = `
-          <p style="margin:0 0 16px;color:#374151;">Hello ${requesterName},</p>
-          <p style="margin:0 0 24px;color:#374151;">A new Offer has been made for your shift swap request.</p>
-          
-          <div style="background:#f9fafb;padding:20px;border-radius:6px;margin:24px 0;">
-            <h3 style="margin:0 0 12px;color:#111827;font-size:16px;">Request Details</h3>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Request ID:</strong> ${requestId}</p>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Shift:</strong> ${shiftStartDate} - ${shiftEndDate}</p>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Reason:</strong> ${requestReason}</p>
-          </div>
-          
-          <p style="margin:0;color:#374151;">Please review the offer and decide whether to accept it.</p>
-        `;
+        <p style="margin:0 0 16px;color:#374151;">Hello ${requesterName},</p>
+        <p style="margin:0 0 24px;color:#374151;">A new offer has been made for your shift swap request.</p>
+        
+        <div style="background:#f9fafb;padding:20px;border-radius:6px;margin:24px 0;">
+          <h3 style="margin:0 0 12px;color:#111827;font-size:16px;">Request Details</h3>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Request ID:</strong> ${requestId}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Status:</strong> ${status}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Requester:</strong> ${requesterName}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Receiver:</strong> ${receiverName}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Original Shift:</strong> ${shiftStartDate} - ${shiftEndDate}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Original Overtime:</strong> ${overtimeStart} - ${overtimeEnd}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Reason:</strong> ${requestReason}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Created At:</strong> ${createdAt}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Updated At:</strong> ${updatedAt}</p>
+        </div>
+        
+        <div style="background:#f0f9ff;padding:20px;border-radius:6px;margin:24px 0;">
+          <h3 style="margin:0 0 12px;color:#111827;font-size:16px;">New Offer Details</h3>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Offered At:</strong> ${offeredAt}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>New Shift Time:</strong> ${newShiftStartDate} - ${newShiftEndDate}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>New Overtime:</strong> ${newOvertimeStart} - ${newOvertimeEnd}</p>
+        </div>
+        
+        <p style="margin:0;color:#374151;">Please review the offer and decide whether to accept it.</p>
+      `;
         buttonText = 'Review Offer';
         break;
 
       case 'offer_accepted':
         const offerMakerName = requestData.offerMaker?.fullName || 'Unknown Employee';
-        subject = 'Your Offer Has Been Accepted';
+        subject = 'Your Shift Swap Offer Has Been Accepted';
         type = 'success';
         content = `
-          <p style="margin:0 0 16px;color:#374151;">Hello ${offerMakerName},</p>
-          <p style="margin:0 0 24px;color:#374151;">Great news! Your Offer has been accepted.</p>
-          
-          <div style="background:#f9fafb;padding:20px;border-radius:6px;margin:24px 0;">
-            <h3 style="margin:0 0 12px;color:#111827;font-size:16px;">Accepted Offer</h3>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Request ID:</strong> ${requestId}</p>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Requester:</strong> ${requesterName}</p>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Shift:</strong> ${shiftStartDate} - ${shiftEndDate}</p>
-          </div>
-          
-          <p style="margin:0;color:#374151;">The request is now pending supervisor approval.</p>
-        `;
+        <p style="margin:0 0 16px;color:#374151;">Hello ${offerMakerName},</p>
+        <p style="margin:0 0 24px;color:#374151;">Great news! Your shift swap offer has been accepted.</p>
+        
+        <div style="background:#f9fafb;padding:20px;border-radius:6px;margin:24px 0;">
+          <h3 style="margin:0 0 12px;color:#111827;font-size:16px;">Complete Request Details</h3>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Request ID:</strong> ${requestId}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Status:</strong> ${status}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Requester:</strong> ${requesterName}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Receiver:</strong> ${receiverName}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Original Shift:</strong> ${shiftStartDate} - ${shiftEndDate}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Original Overtime:</strong> ${overtimeStart} - ${overtimeEnd}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Reason:</strong> ${requestReason}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Created:</strong> ${createdAt}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Last Updated:</strong> ${updatedAt}</p>
+        </div>
+        
+        <div style="background:#f0fdf4;padding:20px;border-radius:6px;margin:24px 0;">
+          <h3 style="margin:0 0 12px;color:#111827;font-size:16px;">Accepted Offer</h3>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Offered At:</strong> ${offeredAt}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>New Shift Time:</strong> ${newShiftStartDate} - ${newShiftEndDate}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>New Overtime:</strong> ${newOvertimeStart} - ${newOvertimeEnd}</p>
+        </div>
+        
+        <p style="margin:0;color:#374151;">The request is now pending supervisor approval.</p>
+      `;
         buttonText = 'View Details';
         break;
 
@@ -131,18 +189,30 @@ class EmailService {
         subject = 'Shift Swap Request Approved';
         type = 'success';
         content = `
-          <p style="margin:0 0 16px;color:#374151;">Hello,</p>
-          <p style="margin:0 0 24px;color:#374151;">Your shift swap request has been approved.</p>
-          
-          <div style="background:#f9fafb;padding:20px;border-radius:6px;margin:24px 0;">
-            <h3 style="margin:0 0 12px;color:#111827;font-size:16px;">Approved Request</h3>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Request ID:</strong> ${requestId}</p>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Requester:</strong> ${requesterName}</p>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Shift:</strong> ${shiftStartDate} - ${shiftEndDate}</p>
-          </div>
-          
-          <p style="margin:0;color:#374151;">The shift swap is now confirmed and active.</p>
-        `;
+        <p style="margin:0 0 16px;color:#374151;">Hello,</p>
+        <p style="margin:0 0 24px;color:#374151;">Your shift swap request has been approved.</p>
+        
+        <div style="background:#f9fafb;padding:20px;border-radius:6px;margin:24px 0;">
+          <h3 style="margin:0 0 12px;color:#111827;font-size:16px;">Complete Approved Request</h3>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Request ID:</strong> ${requestId}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Status:</strong> ${status}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Requester:</strong> ${requesterName}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Receiver:</strong> ${receiverName}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Original Shift:</strong> ${shiftStartDate} - ${shiftEndDate}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Original Overtime:</strong> ${overtimeStart} - ${overtimeEnd}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Reason:</strong> ${requestReason}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Created:</strong> ${createdAt}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Approved At:</strong> ${updatedAt}</p>
+        </div>
+        
+        <div style="background:#f0fdf4;padding:20px;border-radius:6px;margin:24px 0;">
+          <h3 style="margin:0 0 12px;color:#111827;font-size:16px;">Final Approved Schedule</h3>
+          <p style="margin:4px 0;color:#6b7280;"><strong>New Shift Time:</strong> ${newShiftStartDate} - ${newShiftEndDate}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>New Overtime:</strong> ${newOvertimeStart} - ${newOvertimeEnd}</p>
+        </div>
+        
+        <p style="margin:0;color:#374151;">The shift swap is now confirmed and active.</p>
+      `;
         buttonText = 'View Schedule';
         break;
 
@@ -151,18 +221,25 @@ class EmailService {
         subject = 'Shift Swap Request Rejected';
         type = 'error';
         content = `
-          <p style="margin:0 0 16px;color:#374151;">Hello,</p>
-          <p style="margin:0 0 24px;color:#374151;">Your shift swap request has been rejected.</p>
-          
-          <div style="background:#f9fafb;padding:20px;border-radius:6px;margin:24px 0;">
-            <h3 style="margin:0 0 12px;color:#111827;font-size:16px;">Rejected Request</h3>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Request ID:</strong> ${requestId}</p>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Shift:</strong> ${shiftStartDate} - ${shiftEndDate}</p>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Rejection Reason:</strong> ${rejectionReason}</p>
-          </div>
-          
-          <p style="margin:0;color:#374151;">Please contact your supervisor for more information.</p>
-        `;
+        <p style="margin:0 0 16px;color:#374151;">Hello,</p>
+        <p style="margin:0 0 24px;color:#374151;">Your shift swap request has been rejected.</p>
+        
+        <div style="background:#f9fafb;padding:20px;border-radius:6px;margin:24px 0;">
+          <h3 style="margin:0 0 12px;color:#111827;font-size:16px;">Complete Rejected Request</h3>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Request ID:</strong> ${requestId}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Status:</strong> ${status}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Requester:</strong> ${requesterName}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Receiver:</strong> ${receiverName}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Original Shift:</strong> ${shiftStartDate} - ${shiftEndDate}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Original Overtime:</strong> ${overtimeStart} - ${overtimeEnd}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Original Reason:</strong> ${requestReason}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Rejection Reason:</strong> ${rejectionReason}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Created:</strong> ${createdAt}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Rejected At:</strong> ${updatedAt}</p>
+        </div>
+        
+        <p style="margin:0;color:#374151;">Please contact your supervisor for more information.</p>
+      `;
         buttonText = 'Contact Support';
         break;
 
@@ -171,20 +248,33 @@ class EmailService {
         subject = `Shift Swap Request ${action.charAt(0).toUpperCase() + action.slice(1)}`;
         type = 'warning';
         content = `
-          <p style="margin:0 0 16px;color:#374151;">Hello,</p>
-          <p style="margin:0 0 24px;color:#374151;">A shift swap request requires your attention.</p>
-          
-          <div style="background:#f9fafb;padding:20px;border-radius:6px;margin:24px 0;">
-            <h3 style="margin:0 0 12px;color:#111827;font-size:16px;">Request Details</h3>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Request ID:</strong> ${requestId}</p>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Requester:</strong> ${requesterName}</p>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Shift:</strong> ${shiftStartDate} - ${shiftEndDate}</p>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Status:</strong> ${action.charAt(0).toUpperCase() + action.slice(1)}</p>
-          </div>
-          
-          <p style="margin:0;color:#374151;">Please review and take necessary action.</p>
-        `;
-        buttonText = 'Review Request';
+        <p style="margin:0 0 16px;color:#374151;">Hello,</p>
+        <p style="margin:0 0 24px;color:#374151;">A shift swap request requires your attention.</p>
+        
+        <div style="background:#f9fafb;padding:20px;border-radius:6px;margin:24px 0;">
+          <h3 style="margin:0 0 12px;color:#111827;font-size:16px;">Complete Request Details</h3>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Request ID:</strong> ${requestId}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Status:</strong> ${status}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Action:</strong> ${action.charAt(0).toUpperCase() + action.slice(1)}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Requester:</strong> ${requesterName}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Receiver:</strong> ${receiverName}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Original Shift:</strong> ${shiftStartDate} - ${shiftEndDate}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Original Overtime:</strong> ${overtimeStart} - ${overtimeEnd}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Reason:</strong> ${requestReason}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Created:</strong> ${createdAt}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Last Updated:</strong> ${updatedAt}</p>
+        </div>
+        
+        <div style="background:#fef3c7;padding:20px;border-radius:6px;margin:24px 0;">
+          <h3 style="margin:0 0 12px;color:#111827;font-size:16px;">Current Accepted Offer</h3>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Offered At:</strong> ${offeredAt}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>New Shift Time:</strong> ${newShiftStartDate} - ${newShiftEndDate}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>New Overtime:</strong> ${newOvertimeStart} - ${newOvertimeEnd}</p>
+        </div>
+        
+        <p style="margin:0;color:#374151;">Please review and take necessary action.</p>
+      `;
+        buttonText = 'Review your schedule now!';
         break;
 
       default:
@@ -219,10 +309,42 @@ class EmailService {
   // Day off swap notifications
   async sendDayOffSwapNotification(notificationType, recipient, requestData) {
     const requesterName = requestData.requesterUserId?.fullName || 'Unknown Requester';
+    const receiverName = requestData.receiverUserId?.fullName || 'Unknown Receiver';
+
     const originalDayOff = requestData.originalDayOff ? new Date(requestData.originalDayOff).toLocaleDateString() : 'Unknown Date';
     const requestedDayOff = requestData.requestedDayOff ? new Date(requestData.requestedDayOff).toLocaleDateString() : 'Unknown Date';
+    const shiftStartDate = requestData.shiftStartDate ? new Date(requestData.shiftStartDate).toLocaleString() : 'Not specified';
+    const shiftEndDate = requestData.shiftEndDate ? new Date(requestData.shiftEndDate).toLocaleString() : 'Not specified';
+    const overtimeStart = requestData.overtimeStart ? new Date(requestData.overtimeStart).toLocaleString() : 'None';
+    const overtimeEnd = requestData.overtimeEnd ? new Date(requestData.overtimeEnd).toLocaleString() : 'None';
+
     const reason = requestData.reason || 'No reason provided';
     const requestId = requestData._id || 'Unknown ID';
+    const status = requestData.status || 'Unknown Status';
+    const createdAt = requestData.createdAt ? new Date(requestData.createdAt).toLocaleString() : 'Unknown';
+    const updatedAt = requestData.updatedAt ? new Date(requestData.updatedAt).toLocaleString() : 'Unknown';
+
+    const acceptedOffer = requestData.negotiationHistory?.find(item => item.status === "accepted");
+
+    const newShiftStartDate = acceptedOffer?.shiftStartDate
+      ? new Date(acceptedOffer.shiftStartDate).toLocaleString()
+      : 'Not specified';
+
+    const newShiftEndDate = acceptedOffer?.shiftEndDate
+      ? new Date(acceptedOffer.shiftEndDate).toLocaleString()
+      : 'Not specified';
+
+    const newOvertimeStart = acceptedOffer?.overtimeStart
+      ? new Date(acceptedOffer.overtimeStart).toLocaleString()
+      : 'None';
+
+    const newOvertimeEnd = acceptedOffer?.overtimeEnd
+      ? new Date(acceptedOffer.overtimeEnd).toLocaleString()
+      : 'None';
+
+    const offeredAt = acceptedOffer?.offeredAt
+      ? new Date(acceptedOffer.offeredAt).toLocaleString()
+      : 'Unknown Time';
 
     let subject, content, buttonText, type;
 
@@ -231,19 +353,34 @@ class EmailService {
         subject = 'New Offer for Your Day Off Swap Request';
         type = 'info';
         content = `
-          <p style="margin:0 0 16px;color:#374151;">Hello ${requesterName},</p>
-          <p style="margin:0 0 24px;color:#374151;">A new offer has been made for your day off swap request.</p>
-          
-          <div style="background:#f9fafb;padding:20px;border-radius:6px;margin:24px 0;">
-            <h3 style="margin:0 0 12px;color:#111827;font-size:16px;">Request Details</h3>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Request ID:</strong> ${requestId}</p>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Your Day Off:</strong> ${originalDayOff}</p>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Requested Day:</strong> ${requestedDayOff}</p>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Reason:</strong> ${reason}</p>
-          </div>
-          
-          <p style="margin:0;color:#374151;">Please review the offer and decide whether to accept it.</p>
-        `;
+        <p style="margin:0 0 16px;color:#374151;">Hello ${requesterName},</p>
+        <p style="margin:0 0 24px;color:#374151;">A new offer has been made for your day off swap request.</p>
+        
+        <div style="background:#f9fafb;padding:20px;border-radius:6px;margin:24px 0;">
+          <h3 style="margin:0 0 12px;color:#111827;font-size:16px;">Request Details</h3>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Request ID:</strong> ${requestId}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Status:</strong> ${status}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Company:</strong> ${companyName}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Requester:</strong> ${requesterName}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Receiver:</strong> ${receiverName}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Your Day Off:</strong> ${originalDayOff}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Requested Day:</strong> ${requestedDayOff}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Original Shift Time:</strong> ${shiftStartDate} - ${shiftEndDate}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Original Overtime:</strong> ${overtimeStart} - ${overtimeEnd}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Reason:</strong> ${reason}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Created At:</strong> ${createdAt}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Updated At:</strong> ${updatedAt}</p>
+        </div>
+        
+        <div style="background:#f0f9ff;padding:20px;border-radius:6px;margin:24px 0;">
+          <h3 style="margin:0 0 12px;color:#111827;font-size:16px;">New Offer Details</h3>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Offered At:</strong> ${offeredAt}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>New Shift Time:</strong> ${newShiftStartDate} - ${newShiftEndDate}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>New Overtime:</strong> ${newOvertimeStart} - ${newOvertimeEnd}</p>
+        </div>
+        
+        <p style="margin:0;color:#374151;">Please review the offer and decide whether to accept it.</p>
+      `;
         buttonText = 'Review Offer';
         break;
 
@@ -252,18 +389,32 @@ class EmailService {
         subject = 'Your Day Off Offer Has Been Accepted';
         type = 'success';
         content = `
-          <p style="margin:0 0 16px;color:#374151;">Hello ${matchMakerName},</p>
-          <p style="margin:0 0 24px;color:#374151;">Great news! Your day off swap offer has been accepted.</p>
-          
-          <div style="background:#f9fafb;padding:20px;border-radius:6px;margin:24px 0;">
-            <h3 style="margin:0 0 12px;color:#111827;font-size:16px;">Accepted Offer</h3>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Request ID:</strong> ${requestId}</p>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Requester:</strong> ${requesterName}</p>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Day Off Swap:</strong> ${originalDayOff} ↔ ${requestedDayOff}</p>
-          </div>
-          
-          <p style="margin:0;color:#374151;">The request is now pending supervisor approval.</p>
-        `;
+        <p style="margin:0 0 16px;color:#374151;">Hello ${matchMakerName},</p>
+        <p style="margin:0 0 24px;color:#374151;">Great news! Your day off swap offer has been accepted.</p>
+        
+        <div style="background:#f9fafb;padding:20px;border-radius:6px;margin:24px 0;">
+          <h3 style="margin:0 0 12px;color:#111827;font-size:16px;">Complete Request Details</h3>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Request ID:</strong> ${requestId}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Status:</strong> ${status}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Requester:</strong> ${requesterName}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Receiver:</strong> ${receiverName}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Day Off Swap:</strong> ${originalDayOff} ↔ ${requestedDayOff}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Original Shift:</strong> ${shiftStartDate} - ${shiftEndDate}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Original Overtime:</strong> ${overtimeStart} - ${overtimeEnd}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Reason:</strong> ${reason}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Created:</strong> ${createdAt}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Last Updated:</strong> ${updatedAt}</p>
+        </div>
+        
+        <div style="background:#f0fdf4;padding:20px;border-radius:6px;margin:24px 0;">
+          <h3 style="margin:0 0 12px;color:#111827;font-size:16px;">Accepted Offer</h3>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Offered At:</strong> ${offeredAt}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>New Shift Time:</strong> ${newShiftStartDate} - ${newShiftEndDate}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>New Overtime:</strong> ${newOvertimeStart} - ${newOvertimeEnd}</p>
+        </div>
+        
+        <p style="margin:0;color:#374151;">The request is now pending supervisor approval.</p>
+      `;
         buttonText = 'View Details';
         break;
 
@@ -271,17 +422,31 @@ class EmailService {
         subject = 'Day Off Swap Request Approved';
         type = 'success';
         content = `
-          <p style="margin:0 0 16px;color:#374151;">Hello,</p>
-          <p style="margin:0 0 24px;color:#374151;">Your day off swap request has been approved.</p>
-          
-          <div style="background:#f9fafb;padding:20px;border-radius:6px;margin:24px 0;">
-            <h3 style="margin:0 0 12px;color:#111827;font-size:16px;">Approved Request</h3>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Request ID:</strong> ${requestId}</p>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Day Off Swap:</strong> ${originalDayOff} ↔ ${requestedDayOff}</p>
-          </div>
-          
-          <p style="margin:0;color:#374151;">The day off swap is now confirmed and active.</p>
-        `;
+        <p style="margin:0 0 16px;color:#374151;">Hello,</p>
+        <p style="margin:0 0 24px;color:#374151;">Your day off swap request has been approved.</p>
+        
+        <div style="background:#f9fafb;padding:20px;border-radius:6px;margin:24px 0;">
+          <h3 style="margin:0 0 12px;color:#111827;font-size:16px;">Complete Approved Request</h3>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Request ID:</strong> ${requestId}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Status:</strong> ${status}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Requester:</strong> ${requesterName}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Receiver:</strong> ${receiverName}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Day Off Swap:</strong> ${originalDayOff} ↔ ${requestedDayOff}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Original Shift:</strong> ${shiftStartDate} - ${shiftEndDate}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Original Overtime:</strong> ${overtimeStart} - ${overtimeEnd}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Reason:</strong> ${reason}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Created:</strong> ${createdAt}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Approved At:</strong> ${updatedAt}</p>
+        </div>
+        
+        <div style="background:#f0fdf4;padding:20px;border-radius:6px;margin:24px 0;">
+          <h3 style="margin:0 0 12px;color:#111827;font-size:16px;">Final Approved Schedule</h3>
+          <p style="margin:4px 0;color:#6b7280;"><strong>New Shift Time:</strong> ${newShiftStartDate} - ${newShiftEndDate}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>New Overtime:</strong> ${newOvertimeStart} - ${newOvertimeEnd}</p>
+        </div>
+        
+        <p style="margin:0;color:#374151;">The day off swap is now confirmed and active.</p>
+      `;
         buttonText = 'View Schedule';
         break;
 
@@ -290,18 +455,26 @@ class EmailService {
         subject = 'Day Off Swap Request Rejected';
         type = 'error';
         content = `
-          <p style="margin:0 0 16px;color:#374151;">Hello,</p>
-          <p style="margin:0 0 24px;color:#374151;">Your day off swap request has been rejected.</p>
-          
-          <div style="background:#f9fafb;padding:20px;border-radius:6px;margin:24px 0;">
-            <h3 style="margin:0 0 12px;color:#111827;font-size:16px;">Rejected Request</h3>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Request ID:</strong> ${requestId}</p>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Day Off Swap:</strong> ${originalDayOff} ↔ ${requestedDayOff}</p>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Rejection Reason:</strong> ${rejectionReason}</p>
-          </div>
-          
-          <p style="margin:0;color:#374151;">Please contact your supervisor for more information.</p>
-        `;
+        <p style="margin:0 0 16px;color:#374151;">Hello,</p>
+        <p style="margin:0 0 24px;color:#374151;">Your day off swap request has been rejected.</p>
+        
+        <div style="background:#f9fafb;padding:20px;border-radius:6px;margin:24px 0;">
+          <h3 style="margin:0 0 12px;color:#111827;font-size:16px;">Complete Rejected Request</h3>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Request ID:</strong> ${requestId}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Status:</strong> ${status}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Requester:</strong> ${requesterName}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Receiver:</strong> ${receiverName}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Day Off Swap:</strong> ${originalDayOff} ↔ ${requestedDayOff}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Original Shift:</strong> ${shiftStartDate} - ${shiftEndDate}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Original Overtime:</strong> ${overtimeStart} - ${overtimeEnd}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Original Reason:</strong> ${reason}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Rejection Reason:</strong> ${rejectionReason}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Created:</strong> ${createdAt}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Rejected At:</strong> ${updatedAt}</p>
+        </div>
+        
+        <p style="margin:0;color:#374151;">Please contact your supervisor for more information.</p>
+      `;
         buttonText = 'Contact Support';
         break;
 
@@ -310,19 +483,33 @@ class EmailService {
         subject = `Day Off Swap Request ${action.charAt(0).toUpperCase() + action.slice(1)}`;
         type = 'warning';
         content = `
-          <p style="margin:0 0 16px;color:#374151;">Hello,</p>
-          <p style="margin:0 0 24px;color:#374151;">A day off swap request requires your attention.</p>
-          
-          <div style="background:#f9fafb;padding:20px;border-radius:6px;margin:24px 0;">
-            <h3 style="margin:0 0 12px;color:#111827;font-size:16px;">Request Details</h3>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Request ID:</strong> ${requestId}</p>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Requester:</strong> ${requesterName}</p>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Day Off Swap:</strong> ${originalDayOff} ↔ ${requestedDayOff}</p>
-            <p style="margin:4px 0;color:#6b7280;"><strong>Status:</strong> ${action.charAt(0).toUpperCase() + action.slice(1)}</p>
-          </div>
-          
-          <p style="margin:0;color:#374151;">Please review and take necessary action.</p>
-        `;
+        <p style="margin:0 0 16px;color:#374151;">Hello,</p>
+        <p style="margin:0 0 24px;color:#374151;">A day off swap request requires your attention.</p>
+        
+        <div style="background:#f9fafb;padding:20px;border-radius:6px;margin:24px 0;">
+          <h3 style="margin:0 0 12px;color:#111827;font-size:16px;">Complete Request Details</h3>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Request ID:</strong> ${requestId}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Status:</strong> ${status}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Action:</strong> ${action.charAt(0).toUpperCase() + action.slice(1)}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Requester:</strong> ${requesterName}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Receiver:</strong> ${receiverName}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Day Off Swap:</strong> ${originalDayOff} ↔ ${requestedDayOff}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Original Shift:</strong> ${shiftStartDate} - ${shiftEndDate}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Original Overtime:</strong> ${overtimeStart} - ${overtimeEnd}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Reason:</strong> ${reason}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Created:</strong> ${createdAt}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Last Updated:</strong> ${updatedAt}</p>
+        </div>
+        
+        <div style="background:#fef3c7;padding:20px;border-radius:6px;margin:24px 0;">
+          <h3 style="margin:0 0 12px;color:#111827;font-size:16px;">Current Accepted Offer</h3>
+          <p style="margin:4px 0;color:#6b7280;"><strong>Offered At:</strong> ${offeredAt}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>New Shift Time:</strong> ${newShiftStartDate} - ${newShiftEndDate}</p>
+          <p style="margin:4px 0;color:#6b7280;"><strong>New Overtime:</strong> ${newOvertimeStart} - ${newOvertimeEnd}</p>
+        </div>
+        
+        <p style="margin:0;color:#374151;">Please review and take necessary action.</p>
+      `;
         buttonText = 'Review Request';
         break;
 

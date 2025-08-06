@@ -27,6 +27,23 @@ const CompanySchema = new mongoose.Schema(
       required: true,
       minlength: 6,
     },
+    phone: {
+      type: String,
+      required: true,
+      trim: true,
+      validate: {
+        validator: function (value) {
+          // RegEx for international phone numbers
+          return /^(\+[\d]{1,3}[- ]?)?[\d- ]{4,14}$/.test(value);
+        },
+        message: 'Phone number must be a valid international number.',
+      },
+    },
+    logo: {
+      type: String,
+      required: false, // Changed from true to false
+      trim: true,
+    },
     isVerified: {
       type: Boolean,
       default: false,

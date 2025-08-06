@@ -37,8 +37,6 @@ exports.createEmployee = async (req, res) => {
       data: employee,
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: 'Server error', error: err.message });
     if (err.code === 11000) {
       return res.status(400).json({
         success: false,
@@ -171,6 +169,9 @@ exports.deleteEmployee = async (req, res) => {
 /**
  * BULK UPLOAD - Add multiple employees from Excel file
  */
+/**
+ * BULK UPLOAD - Add multiple employees from Excel file
+ */
 exports.uploadEmployeesExcel = async (req, res) => {
   if (!req.file) { // Note: multer puts file in req.file (not req.files.file)
     return res.status(400).json({
@@ -178,12 +179,9 @@ exports.uploadEmployeesExcel = async (req, res) => {
       message: 'No file uploaded. Please upload an Excel (.xlsx, .xls) or CSV (.csv) file.',
     });
   }
-
   const file = req.file; // multer uses req.file for single upload
-
   let workbook;
   let data;
-
   try {
     // Handle by file extension
     if (file.originalname.endsWith('.csv')) {
@@ -193,46 +191,38 @@ exports.uploadEmployeesExcel = async (req, res) => {
       // Excel files
       workbook = xlsx.read(file.buffer, { type: 'buffer' });
     }
-
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
     data = xlsx.utils.sheet_to_json(sheet);
-
     if (data.length === 0) {
       return res.status(400).json({
         success: false,
         message: 'Uploaded file is empty.',
       });
     }
-
     const companyId = req.companyId;
     const employeesToInsert = [];
     const errors = [];
     const seenIds = new Set();
-
     for (let row of data) {
       const employeeId = row['Employee ID'] || row['employeeId'] || row['ID'];
       const name = row['Name'] || row['name'];
       const position = row['Position'] || row['position'];
-
       if (!employeeId || !name || !position) {
-        errors.push({ row, error: 'Missing required fields: Employee ID, Name, or Position' });
+        errors.push({ row: row, error: 'Missing required fields: Employee ID, Name, or Position' });
         continue;
       }
-
       const validation = validateCreateEmployee({ employeeId, name, position, companyId });
       if (!validation.isValid) {
-        errors.push({ row: { employeeId, name, position }, error: validation.errors });
+        errors.push({ row: row, error: validation.errors });
         continue;
       }
-
       const finalId = employeeId.toString().trim().toUpperCase();
       if (seenIds.has(finalId)) {
-        errors.push({ row: { employeeId, name, position }, error: 'Duplicate ID in file' });
+        errors.push({ row: row, error: 'Duplicate ID in file' });
         continue;
       }
       seenIds.add(finalId);
-
       employeesToInsert.push({
         employeeId: finalId,
         name: name.toString().trim(),
@@ -240,15 +230,13 @@ exports.uploadEmployeesExcel = async (req, res) => {
         companyId,
       });
     }
-
     if (employeesToInsert.length === 0) {
       return res.status(400).json({
         success: false,
         message: 'No valid data to insert.',
-        errors,
+        errors: errors,
       });
     }
-
     const result = await EmployeesIDs.insertMany(employeesToInsert, { ordered: false });
     return res.status(201).json({
       success: true,
@@ -256,7 +244,6 @@ exports.uploadEmployeesExcel = async (req, res) => {
       insertedCount: result.length,
       errors: errors.length ? errors : null,
     });
-
   } catch (err) {
     if (err.code === 11000) {
       return res.status(400).json({
@@ -264,11 +251,18 @@ exports.uploadEmployeesExcel = async (req, res) => {
         message: 'One or more employee IDs already exist.',
       });
     }
+    if (err instanceof Error) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to process file.',
+        error: err.message,
+      });
+    }
     console.error('Upload error:', err);
     return res.status(500).json({
       success: false,
-      message: 'Failed to process file.',
+      message: 'An unexpected error occurred.',
       error: err.message,
     });
   }
-};
+}; 

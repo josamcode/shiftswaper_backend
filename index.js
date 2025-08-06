@@ -30,6 +30,8 @@ app.use(cors({
   credentials: true
 }));
 
+app.use(express.static('public'));
+
 // Routes
 app.use('/api/company-auth', authRoutes);
 app.use('/api/employee-requests', employeeRequestRoutes);

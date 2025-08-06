@@ -1,13 +1,27 @@
-// controllers/auth.controller.js
 const Company = require('../models/company.model');
 const EmailService = require('../services/email.service');
 const JWTService = require('../services/jwt.service');
-const { handleValidationErrors } = require('../validators/validationResult');
 
 // Register company and send OTP
 const registerCompany = async (req, res) => {
   try {
-    const { name, description, email, password } = req.body;
+    const { name, description, email, password, phone } = req.body;
+
+    // Validate required fields
+    if (!name || !description || !email || !password || !phone) {
+      return res.status(400).json({
+        success: false,
+        message: 'All fields are required'
+      });
+    }
+
+    // Validate if logo file is uploaded
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Logo file is required'
+      });
+    }
 
     // Check if company already exists
     const existingCompany = await Company.findOne({
@@ -26,7 +40,9 @@ const registerCompany = async (req, res) => {
       name,
       description,
       email,
-      password
+      password,
+      phone,
+      logo: `${req.file.filename}`
     });
 
     // Generate and save OTP with rate limiting
@@ -58,12 +74,12 @@ const registerCompany = async (req, res) => {
       data: {
         companyId: company._id,
         email: company.email,
-        name: company.name
+        name: company.name,
+        logo: company.logo
       }
     });
 
   } catch (error) {
-    console.error('Registration error:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error'
@@ -186,6 +202,7 @@ const loginCompany = async (req, res) => {
         id: company._id,
         name: company.name,
         email: company.email,
+        logo: company.logo,
         isVerified: company.isVerified
       },
       token
@@ -204,6 +221,13 @@ const loginCompany = async (req, res) => {
 const resendOTP = async (req, res) => {
   try {
     const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required!'
+      });
+    }
 
     const company = await Company.findOne({ email });
 
@@ -261,7 +285,10 @@ const resendOTP = async (req, res) => {
 // Get all companies (name and ID only)
 const getAllCompanies = async (req, res) => {
   try {
-    const companies = await Company.find({}, '_id name'); // Only fetch _id and name
+    const companies = await Company.find(
+      { isVerified: true },
+      '_id name logo'
+    );
 
     res.status(200).json({
       success: true,

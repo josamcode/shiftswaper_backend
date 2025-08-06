@@ -1,5 +1,7 @@
 const express = require('express');
 const router = express.Router();
+const upload = require('../config/multer.config');
+const multerErrorHandler = require('../middleware/multerErrorHandler'); // Add this
 
 // routes/auth.routes.js
 const {
@@ -17,10 +19,13 @@ const {
 const { handleValidationErrors } = require('../validators/validationResult');
 
 // Register company (step 1)
+// The upload middleware handles the file upload and populates req.file and req.body
 router.post('/register',
-  validateRegister,
-  handleValidationErrors,
-  registerCompany
+  upload.single('logo'), // This middleware processes the multipart/form-data
+  multerErrorHandler,
+  validateRegister,      // Uncomment if you want validation
+  handleValidationErrors, // Uncomment if you want validation
+  registerCompany        // Your controller can now access req.file and req.body directly
 );
 
 // Verify OTP (step 2)
@@ -39,7 +44,6 @@ router.post('/login',
 
 // Resend OTP
 router.post('/resend-otp',
-  validateLogin,
   handleValidationErrors,
   resendOTP
 );
