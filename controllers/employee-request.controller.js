@@ -547,6 +547,234 @@ const resendRequestOTP = async (req, res) => {
   }
 };
 
+// Forgot Password - Send OTP to email
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    // Find employee by email
+    const employee = await Employee.findOne({
+      email: email.toLowerCase().trim()
+    });
+
+    if (!employee) {
+      // Don't reveal if email exists or not for security reasons
+      return res.json({
+        success: true,
+        message: 'If an account with this email exists, you will receive a password reset OTP shortly.'
+      });
+    }
+
+    // Generate OTP with rate limiting
+    let otp;
+    try {
+      otp = employee.generateResetPasswordOTP();
+    } catch (rateLimitError) {
+      return res.status(429).json({
+        success: false,
+        message: rateLimitError.message
+      });
+    }
+
+    await employee.save();
+
+    // Send OTP via email
+    const emailResult = await EmailService.sendOTP(employee.email, otp, 'password_reset');
+    if (!emailResult.success) {
+      // Clear the OTP if email sending failed
+      employee.clearResetPasswordOTP();
+      await employee.save();
+
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to send password reset OTP. Please try again later.'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Password reset OTP has been sent to your email address.'
+    });
+
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error. Please try again later.'
+    });
+  }
+};
+
+const verifyResetPasswordOTP = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    const employee = await Employee.findOne({
+      email: email.toLowerCase().trim()
+    });
+
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: 'Employee not found'
+      });
+    }
+
+    // Verify OTP with attempt tracking
+    try {
+      const isOTPValid = employee.verifyResetPasswordOTP(otp);
+
+      if (!isOTPValid) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid or expired OTP'
+        });
+      }
+    } catch (verificationError) {
+      await employee.save();
+      return res.status(400).json({
+        success: false,
+        message: verificationError.message
+      });
+    }
+
+    employee.resetOTPAttempts = 0;
+    await employee.save();
+
+    res.json({
+      success: true,
+      message: 'OTP verified successfully. You can now reset your password.',
+      verified: true
+    });
+
+  } catch (error) {
+    console.error('Verify reset password OTP error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+};
+
+// Reset Password using OTP
+const resetPassword = async (req, res) => {
+  try {
+    const { email, otp, newPassword, confirmPassword } = req.body;
+
+    // Check if passwords match
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password and confirm password do not match'
+      });
+    }
+
+    const employee = await Employee.findOne({
+      email: email.toLowerCase().trim()
+    });
+
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: 'Employee not found'
+      });
+    }
+
+    // Verify OTP
+    try {
+      const isOTPValid = employee.verifyResetPasswordOTP(otp);
+
+      if (!isOTPValid) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid or expired OTP'
+        });
+      }
+    } catch (verificationError) {
+      await employee.save(); // Save the attempt count or lock status
+      return res.status(400).json({
+        success: false,
+        message: verificationError.message
+      });
+    }
+
+    // Update password (will be hashed by pre-save middleware)
+    employee.password = newPassword;
+
+    // OTP fields are already cleared by verifyResetPasswordOTP method
+    await employee.save();
+
+    res.json({
+      success: true,
+      message: 'Password has been reset successfully. You can now login with your new password.'
+    });
+
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error. Please try again later.'
+    });
+  }
+};
+
+// Resend OTP for password reset
+const resendResetPasswordOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    const employee = await Employee.findOne({
+      email: email.toLowerCase().trim()
+    });
+
+    if (!employee) {
+      // Don't reveal if email exists or not for security reasons
+      return res.json({
+        success: true,
+        message: 'If an account with this email exists, you will receive a password reset OTP shortly.'
+      });
+    }
+
+    // Generate new OTP with rate limiting
+    let otp;
+    try {
+      otp = employee.generateResetPasswordOTP();
+    } catch (rateLimitError) {
+      return res.status(429).json({
+        success: false,
+        message: rateLimitError.message
+      });
+    }
+
+    await employee.save();
+
+    // Send OTP via email
+    const emailResult = await EmailService.sendOTP(employee.email, otp, 'password_reset');
+    if (!emailResult.success) {
+      // Clear the OTP if email sending failed
+      employee.clearResetPasswordOTP();
+      await employee.save();
+
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to send password reset OTP. Please try again later.'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Password reset OTP has been resent to your email address.'
+    });
+
+  } catch (error) {
+    console.error('Resend reset password OTP error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+};
+
 module.exports = {
   submitEmployeeRequest,
   verifyRequestOTP,
@@ -554,5 +782,10 @@ module.exports = {
   getAllRequests,
   processEmployeeRequest,
   loginEmployee,
-  resendRequestOTP
+  resendRequestOTP,
+
+  forgotPassword,
+  verifyResetPasswordOTP,
+  resetPassword,
+  resendResetPasswordOTP
 };

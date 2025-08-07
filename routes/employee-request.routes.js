@@ -7,21 +7,30 @@ const {
   getAllRequests,
   processEmployeeRequest,
   loginEmployee,
-  resendRequestOTP
+  resendRequestOTP,
+  forgotPassword,
+  verifyResetPasswordOTP,
+  resetPassword,
+  resendResetPasswordOTP
 } = require('../controllers/employee-request.controller');
+
 const {
   validateEmployeeRequest,
   validateRequestAction,
   validateVerifyRequestOTP,
   validateResendRequestOTP,
-  validateEmployeeLogin
+  validateEmployeeLogin,
+  validateForgotPassword,
+  validateVerifyResetPasswordOTP,
+  validateResetPassword,
+  validateResendResetPasswordOTP
 } = require('../validators/employee-request.validator');
+
 const { handleValidationErrors } = require('../validators/validationResult');
 const { authenticateCompany, authenticateEmployee } = require('../middleware/auth.middleware');
 
 const router = express.Router();
 
-// Public routes
 router.post('/submit-request',
   validateEmployeeRequest,
   handleValidationErrors,
@@ -34,19 +43,42 @@ router.post('/verify-request-otp',
   verifyRequestOTP
 );
 
-router.post('/login',
-  validateEmployeeLogin,
-  handleValidationErrors,
-  loginEmployee
-);
-
 router.post('/resend-request-otp',
   validateResendRequestOTP,
   handleValidationErrors,
   resendRequestOTP
 );
 
-// Protected routes - Company authentication
+router.post('/login',
+  validateEmployeeLogin,
+  handleValidationErrors,
+  loginEmployee
+);
+
+router.post('/forgot-password',
+  validateForgotPassword,
+  handleValidationErrors,
+  forgotPassword
+);
+
+router.post('/verify-reset-password-otp',
+  validateVerifyResetPasswordOTP,
+  handleValidationErrors,
+  verifyResetPasswordOTP
+);
+
+router.post('/reset-password',
+  validateResetPassword,
+  handleValidationErrors,
+  resetPassword
+);
+
+router.post('/resend-reset-password-otp',
+  validateResendResetPasswordOTP,
+  handleValidationErrors,
+  resendResetPasswordOTP
+);
+
 router.get('/company/requests',
   authenticateCompany,
   getCompanyRequests

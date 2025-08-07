@@ -99,11 +99,67 @@ const validateEmployeeLogin = [
     .withMessage('Password must be at least 6 characters long')
 ];
 
-// Update exports
+// Validate forgot password request
+const validateForgotPassword = [
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Please provide a valid email address'),
+];
+
+// Validate verify reset password OTP
+const validateVerifyResetPasswordOTP = [
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Please provide a valid email address'),
+  body('otp')
+    .isLength({ min: 6, max: 6 })
+    .isNumeric()
+    .withMessage('OTP must be a 6-digit number'),
+];
+
+// Validate reset password
+const validateResetPassword = [
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Please provide a valid email address'),
+  body('otp')
+    .isLength({ min: 6, max: 6 })
+    .isNumeric()
+    .withMessage('OTP must be a 6-digit number'),
+  body('newPassword')
+    .isLength({ min: 6 })
+    .withMessage('New password must be at least 6 characters long')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+    .withMessage('New password must contain at least one uppercase letter, one lowercase letter, and one number'),
+  body('confirmPassword')
+    .custom((value, { req }) => {
+      if (value !== req.body.newPassword) {
+        throw new Error('Confirm password does not match new password');
+      }
+      return true;
+    }),
+];
+
+// Validate resend reset password OTP
+const validateResendResetPasswordOTP = [
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Please provide a valid email address'),
+];
+
 module.exports = {
   validateEmployeeRequest,
   validateRequestAction,
   validateVerifyRequestOTP,
   validateResendRequestOTP,
-  validateEmployeeLogin
+  validateEmployeeLogin,
+
+  validateForgotPassword,
+  validateVerifyResetPasswordOTP,
+  validateResetPassword,
+  validateResendResetPasswordOTP
 };
