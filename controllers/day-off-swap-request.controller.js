@@ -19,6 +19,7 @@ const createDayOffSwapRequest = async (req, res) => {
 
     const requesterUserId = req.employeeId;
     const companyId = req.employee.companyId;
+    const userPosition = req.employee.position;
     const firstSupervisorId = req.employee.supervisorId;
 
     // Validate company exists
@@ -72,7 +73,8 @@ const createDayOffSwapRequest = async (req, res) => {
       reason,
       requesterUserId,
       companyId,
-      firstSupervisorId
+      firstSupervisorId,
+      userPosition
     });
 
     await dayOffSwapRequest.save();
@@ -168,10 +170,18 @@ const getDayOffSwapRequests = async (req, res) => {
   try {
     const { status, requesterId, receiverId } = req.query;
     const companyId = req.employee.companyId;
+    const userPosition = req.employee.position;
 
     let filter = { companyId };
 
-    // Apply filters
+    if (userPosition === 'supervisor') {
+      filter.userPosition = 'supervisor';
+    } else if (userPosition === 'expert' || userPosition === 'employee') {
+      filter.userPosition = 'expert';
+    } else if (userPosition === 'sme' || userPosition === 'sme') {
+      filter.userPosition = 'sme';
+    }
+
     if (status) {
       filter.status = status;
     }
@@ -184,7 +194,6 @@ const getDayOffSwapRequests = async (req, res) => {
       filter.receiverUserId = receiverId;
     }
 
-    // Get all requests made by employees in the same company
     const requests = await DayOffSwapRequest.find(filter)
       .populate([
         { path: 'requesterUserId', select: 'fullName accountName email position' },
@@ -197,10 +206,14 @@ const getDayOffSwapRequests = async (req, res) => {
       ])
       .sort({ createdAt: -1 });
 
+    const filteredRequests = requests.filter(
+      request => request.requesterUserId?._id.toString() !== req.employee._id.toString()
+    );
+
     res.json({
       success: true,
       data: {
-        requests
+        requests: filteredRequests
       }
     });
 
@@ -288,6 +301,13 @@ const matchDayOffSwapRequest = async (req, res) => {
 
     // Find the day-off swap request
     const request = await DayOffSwapRequest.findById(requestId);
+
+    if (!req.employee.position !== request.userPosition) {
+      return res.status(404).json({
+        success: false,
+        message: 'You cant get this shift!'
+      });
+    }
 
     if (!request) {
       return res.status(404).json({

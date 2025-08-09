@@ -80,6 +80,11 @@ const DayOffSwapRequestSchema = new mongoose.Schema(
       ref: 'Employee',
       required: false,
     },
+    userPosition: {
+      type: String,
+      required: true,
+      enum: ["expert", "supervisor", "sme"]
+    },
     statusEditedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Employee',
@@ -97,7 +102,7 @@ const DayOffSwapRequestSchema = new mongoose.Schema(
         ref: 'Employee',
         required: true,
       },
-      originalDayOff: Date, // Their original day off
+      originalDayOff: Date,
       shiftStartDate: Date,
       shiftEndDate: Date,
       overtimeStart: Date,

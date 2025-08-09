@@ -17,6 +17,7 @@ const createShiftSwapRequest = async (req, res) => {
 
     const requesterUserId = req.employeeId;
     const companyId = req.employee.companyId;
+    const userPosition = req.employee.position;
     const firstSupervisorId = req.employee.supervisorId;
 
     // Validate company exists
@@ -69,7 +70,8 @@ const createShiftSwapRequest = async (req, res) => {
       overtimeEnd,
       requesterUserId,
       companyId,
-      firstSupervisorId
+      firstSupervisorId,
+      userPosition
     });
 
     await shiftSwapRequest.save();
@@ -103,10 +105,18 @@ const getShiftSwapRequests = async (req, res) => {
   try {
     const { status, requesterId, receiverId } = req.query;
     const companyId = req.employee.companyId;
+    const userPosition = req.employee.position;
 
     let filter = { companyId };
 
-    // Apply filters
+    if (userPosition === 'supervisor') {
+      filter.userPosition = 'supervisor';
+    } else if (userPosition === 'expert' || userPosition === 'employee') {
+      filter.userPosition = 'expert';
+    } else if (userPosition === 'sme' || userPosition === 'sme') {
+      filter.userPosition = 'sme';
+    }
+
     if (status) {
       filter.status = status;
     }
@@ -119,7 +129,6 @@ const getShiftSwapRequests = async (req, res) => {
       filter.receiverUserId = receiverId;
     }
 
-    // Get all requests made by any employee in the same company
     const requests = await ShiftSwapRequest.find(filter)
       .populate([
         { path: 'requesterUserId', select: 'fullName accountName email position' },
@@ -132,10 +141,14 @@ const getShiftSwapRequests = async (req, res) => {
       ])
       .sort({ createdAt: -1 });
 
+    const filteredRequests = requests.filter(
+      request => request.requesterUserId?._id.toString() !== req.employee._id.toString()
+    );
+
     res.json({
       success: true,
       data: {
-        requests
+        requests: filteredRequests
       }
     });
 
@@ -538,6 +551,13 @@ const counterOffer = async (req, res) => {
     const companyId = req.employee.companyId;
 
     const request = await ShiftSwapRequest.findById(requestId);
+
+    if (!req.employee.position !== request.userPosition) {
+      return res.status(404).json({
+        success: false,
+        message: 'You cant get this shift!'
+      });
+    }
 
     if (!request) {
       return res.status(404).json({
