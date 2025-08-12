@@ -15,6 +15,14 @@ const ShiftSwapRequestSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
+    desiredShiftStartDate: {
+      type: Date,
+      required: false,
+    },
+    desiredShiftEndDate: {
+      type: Date,
+      required: false,
+    },
     overtimeStart: {
       type: Date,
       required: false,

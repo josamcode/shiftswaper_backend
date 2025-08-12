@@ -11,6 +11,8 @@ const createShiftSwapRequest = async (req, res) => {
       reason,
       shiftStartDate,
       shiftEndDate,
+      desiredShiftStartDate,
+      desiredShiftEndDate,
       overtimeStart,
       overtimeEnd
     } = req.body;
@@ -50,6 +52,8 @@ const createShiftSwapRequest = async (req, res) => {
     const existingRequest = await ShiftSwapRequest.findOne({
       requesterUserId,
       shiftStartDate,
+      desiredShiftStartDate,
+      desiredShiftEndDate,
       shiftEndDate,
       companyId
     });
@@ -66,6 +70,8 @@ const createShiftSwapRequest = async (req, res) => {
       reason,
       shiftStartDate,
       shiftEndDate,
+      desiredShiftStartDate,
+      desiredShiftEndDate,
       overtimeStart,
       overtimeEnd,
       requesterUserId,
@@ -141,14 +147,14 @@ const getShiftSwapRequests = async (req, res) => {
       ])
       .sort({ createdAt: -1 });
 
-    const filteredRequests = requests.filter(
-      request => request.requesterUserId?._id.toString() !== req.employee._id.toString()
-    );
+    // const filteredRequests = requests.filter(
+    //   request => request.requesterUserId?._id.toString() !== req.employee._id.toString()
+    // );
 
     res.json({
       success: true,
       data: {
-        requests: filteredRequests
+        requests: requests
       }
     });
 
@@ -552,7 +558,7 @@ const counterOffer = async (req, res) => {
 
     const request = await ShiftSwapRequest.findById(requestId);
 
-    if (!req.employee.position !== request.userPosition) {
+    if (req.employee.position !== request.userPosition) {
       return res.status(404).json({
         success: false,
         message: 'You cant get this shift!'
