@@ -26,7 +26,7 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 app.use(cors({
-  origin: ['https://shiftswaper.vercel.app', "http://localhost:3000"],
+  origin: ['https://shiftswaper.vercel.app', "https://www.shiftswaper.com", "https://shiftswaper.com"],
   credentials: true
 }));
 
