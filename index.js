@@ -25,8 +25,14 @@ const app = express();
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+// Extra comma-separated origins (e.g. a self-hosted frontend) come from CORS_ORIGINS.
+const extraOrigins = (process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 app.use(cors({
-  origin: ['https://shiftswaper.vercel.app', "https://www.shiftswaper.com", "https://shiftswaper.com"],
+  origin: ['https://shiftswaper.vercel.app', "https://www.shiftswaper.com", "https://shiftswaper.com", ...extraOrigins],
   credentials: true
 }));
 
