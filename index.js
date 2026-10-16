@@ -4,6 +4,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+const helmet = require('helmet');
+const { rateLimit } = require('express-rate-limit');
 const authRoutes = require('./routes/auth.routes');
 const employeeRequestRoutes = require('./routes/employee-request.routes');
 const shiftSwapRequestRoutes = require('./routes/shift-swap-request.routes');
@@ -22,6 +24,38 @@ db.once('open', () => {
 
 // Initialize Express app
 const app = express();
+app.disable('x-powered-by');
+
+// Behind a reverse proxy, set TRUST_PROXY to the number of proxy hops so
+// rate limiting sees the client IP instead of the proxy's.
+if (process.env.TRUST_PROXY) {
+  app.set('trust proxy', Number(process.env.TRUST_PROXY));
+}
+
+// Company logos are loaded by the frontend from another origin.
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+
+// Throttle sign-in, OTP and password reset attempts per client IP.
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  skip: (req) => req.method === 'GET',
+  message: { success: false, message: 'Too many attempts. Please try again later.' }
+});
+app.use([
+  '/api/company-auth',
+  '/api/employee-requests/submit-request',
+  '/api/employee-requests/verify-request-otp',
+  '/api/employee-requests/resend-request-otp',
+  '/api/employee-requests/login',
+  '/api/employee-requests/forgot-password',
+  '/api/employee-requests/verify-reset-password-otp',
+  '/api/employee-requests/reset-password',
+  '/api/employee-requests/resend-reset-password-otp'
+], authLimiter);
+
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
